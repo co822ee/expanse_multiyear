@@ -1,0 +1,58 @@
+source("../EXPANSE_algorithm/scr/fun_call_lib.R")
+source("../EXPANSE_algorithm/scr/fun_read_data.R")
+# Multiple single years
+csv_names <- paste0('run2_',c('08-10', '09-11', '10-12', '08-12'))   #2008:2012
+years <- list(2008:2010, 2009:2011, 2010:2012, 2008:2012)
+# year_i=1
+csv_names
+nfold=5
+
+write_output_5csv <- function(year_i){
+   # paste0("GWR_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv")
+   # list.files("data/workingData/", paste0("GWR_result_all_", csv_names[year_i], "_fold"))
+   slr <- lapply(paste0("data/workingData/SLR_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv"), 
+                 read.csv)
+   # gwr <- lapply(paste0("data/workingData/GWR_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv"), 
+   #               read.csv)
+   rf <- lapply(paste0("data/workingData/RF_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv"), 
+                read.csv)
+   slr_test <- lapply(slr, function(df_data) df_data %>% filter(df_type=='test'))
+   # gwr_test <- lapply(gwr, function(df_data) df_data %>% filter(df_type=='test'))
+   rf_test <- lapply(rf, function(df_data) df_data %>% filter(df_type=='test'))
+   
+   slr_test <- do.call(rbind, slr_test)
+   # gwr_test <- do.call(rbind, gwr_test)
+   rf_test <- do.call(rbind, rf_test)
+   
+   all_test <- cbind(rf=rf_test$rf, slr_test)  #gwr=gwr_test$gwr
+   write.csv(all_test, paste0("data/workingData/NO2_5cv_", csv_names[year_i], ".csv"))
+   
+}
+lapply(seq_along(csv_names), write_output_5csv)
+
+
+ #---- test_grid----
+regression_grd_cellsize <- c(10, 20, 50, 80, 100, 200, 500, 600, 1000, 1500, 2000)   #km
+kernels <- c('exponential')
+year_target <- 2010
+nfolds=5
+comb <- expand.grid(regression_grd_cellsize=regression_grd_cellsize, kernel_type=kernels, nfold=1:nfolds) %>% 
+   mutate(csv_name = paste0('testGWR_', regression_grd_cellsize, '_', kernel_type, '_', year_target, "_fold_", nfold))
+kernel_type <- comb$kernel_type %>% as.character()
+reg_grdsize <- comb$regression_grd_cellsize*1000
+csv_names <- comb$csv_name
+write_output_5csv_test_grid <- function(file_i){
+   # paste0("GWR_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv")
+   # list.files("data/workingData/", paste0("GWR_result_all_", csv_names[year_i], "_fold"))
+
+   gwr <- lapply(paste0("data/workingData/", unique(substr(csv_names, 1, nchar(csv_names)-7))[file_i], "_fold_", seq(1,nfolds), ".csv"), 
+                 read.csv)
+   
+   gwr_test <- do.call(rbind, gwr)
+
+   write.csv(gwr_test, paste0("data/workingData/NO2_5cv_", 
+                              unique(substr(csv_names, 1, nchar(csv_names)-7))[file_i], 
+                              ".csv"))
+   
+}
+lapply(seq_along(unique(substr(csv_names, 1, nchar(csv_names)-7))), write_output_5csv_test_grid)
