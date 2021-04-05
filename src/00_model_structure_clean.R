@@ -6,8 +6,10 @@ tuneRF = F
 # Multiple single years
 
 # Multiple years
-csv_names <- paste0('run2_',c('08-10', '09-11', '10-12', '08-12'))   #2008:2012
-years <- list(2008:2010, 2009:2011, 2010:2012, 2008:2012)
+csv_names <- paste0('run2_',c('08-10', '09-11', '10-12', 
+                              '08-12', '06-12', '05-12', '04-12'))   #2008:2012
+years <- list(2008:2010, 2009:2011, 2010:2012, 
+              2008:2012, 2006:2012, 2005:2012, 2004:2012)
 library(doParallel)
 library(foreach)
 
