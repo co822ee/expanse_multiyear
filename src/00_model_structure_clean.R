@@ -26,7 +26,7 @@ for(yr_i in seq_along(csv_names)){
    # data_all2 <- create_fivefold(no2_e_09_11, seed)
    # identical(data_all1$nfold, data_all2$nfold)
    # gen_train_test <- function(fold_i)
-
+   
    cluster_no <- 5
    cl <- parallel::makeCluster(cluster_no)
    doParallel::registerDoParallel(cl)
@@ -48,13 +48,16 @@ for(yr_i in seq_along(csv_names)){
       source("../EXPANSE_algorithm/scr/fun_slr_for.R")
       # check the predictor variables
       print("SLR predictors:")
-      train_sub %>% dplyr::select(matches(pred_c), "year", "zoneID") %>% names()
-      slr_result <- slr(train_sub$obs, train_sub %>% dplyr::select(matches(pred_c), "year") %>% as.data.frame(),
+      x_var <- train_sub %>% dplyr::select(matches(pred_c), "year", "zoneID") %>% names()
+      slr_result <- slr(train_sub$obs, train_sub %>% dplyr::select(x_var) %>% as.data.frame(),
                         cv_n = csv_name_fold)
       slr_model <- slr_result[[3]]
       #f# SLR: test SLR
+      # source("../EXPANSE_algorithm/scr/fun_output_slr_result.R")
       source("../EXPANSE_algorithm/scr/fun_gen_pred_df.R")
-      output_slr_result <- function(model, test_df, train_df, output_filename, obs_varname){
+      output_slr_result <- function(model, test_df, train_df, output_filename, obs_varname,
+                                    outputselect = c("station_european_code", "slr", "obs", "res", 
+                                                     "nfold", "df_type", "year", "index")){
          slr_poll_test <- gen_pred_df(model, test_df, obs_varname)
          slr_poll_train <- gen_pred_df(model, train_df, obs_varname)
          eval_test <- error_matrix(slr_poll_test[, obs_varname], slr_poll_test$slr)
@@ -62,6 +65,7 @@ for(yr_i in seq_along(csv_names)){
          
          slr_poll <- rbind(slr_poll_train %>% mutate(df_type = 'train'),
                            slr_poll_test %>% mutate(df_type = 'test'))
+         slr_poll <- slr_poll[, outputselect]
          write.csv(slr_poll, 
                    paste0('data/workingData/SLR_result_all_', output_filename, '.csv'), 
                    row.names = F)
@@ -73,7 +77,67 @@ for(yr_i in seq_along(csv_names)){
       
       slr_df <- slr_poll[[1]]
       
-      #f# SLR: perform cross-validation
+      slr_poll$eval_train %>% print()
+      slr_poll$eval_test %>% print()
+      # Force adding other predictors
+      eq_slr <- paste0("obs~", paste(c(names(slr_model$coefficients)[-1],
+                                       "omi", "zoneID", "year"), collapse = "+")) %>% as.formula()
+      
+      slr_2 <- lm(eq_slr, train_sub)  # exclude OMI because the coefficient is negative
+      eq_slr <- paste0("obs~", paste(c(names(slr_model$coefficients)[-1],
+                                       "zoneID", "year"), collapse = "+")) %>% as.formula()
+      
+      slr_2 <- lm(eq_slr, train_sub)  # exclude OMI because the coefficient is negative
+      data_all2 <- rbind(train_sub %>% mutate(df_type='train'), 
+                         test_sub %>% mutate(df_type='test'))
+      poll2 <- gen_pred_df(slr_2, data_all2, "obs")
+      error_matrix(poll2[poll2$df_type=="train", "obs"], poll2$slr[poll2$df_type=="train"])
+      error_matrix(poll2[poll2$df_type=="test", "obs"], poll2$slr[poll2$df_type=="test"])
+      
+      #f# SLR: predict residual using omi
+      # Method 1: lm
+      slr_df2 <- inner_join(slr_df, data_all, by=c("station_european_code", "year", "obs", "nfold", "index"))
+      lm_res <- lm(as.formula(paste0("res~omi+zoneID+year")), slr_df2[slr_df2$df_type=="train", ])
+      lm_res %>% summary
+      slr_poll2 <- data.frame(slr = (predict(lm_res, slr_df2) %>% as.numeric())+slr_df2$slr,
+                              obs = slr_df2[, "obs"]) %>% 
+         mutate(res = obs - slr) %>% 
+         cbind(slr_df2 %>% dplyr::select(-all_of("obs")))
+      
+      error_matrix(slr_poll2[slr_poll2$df_type=="train", "obs"], slr_poll2$slr[slr_poll2$df_type=="train"])
+      error_matrix(slr_poll2[slr_poll2$df_type=="test", "obs"], slr_poll2$slr[slr_poll2$df_type=="test"])
+      # Method 2: RF
+      rf_res <- ranger(
+         formula = as.formula(paste0("res~", paste(x_var, collapse = "+"))),
+         data = slr_df2[slr_df2$df_type=="train", ],
+         num.trees = 500,
+         seed = seed,
+         importance = 'impurity'          # 'permutation'
+      )
+      
+      slr_rf_result <- data.frame(rf = (predict(rf_res, slr_df2) %>% predictions()) + slr_df2$slr,
+                                  obs = slr_df2[, "obs"]) %>% 
+         mutate(res = obs - rf) %>% 
+         cbind(slr_df2 %>% dplyr::select(-all_of("obs"))) 
+      
+      error_matrix(slr_rf_result[slr_rf_result$df_type=="train", "obs"], slr_rf_result$rf[slr_rf_result$df_type=="train"])
+      error_matrix(slr_rf_result[slr_rf_result$df_type=="test", "obs"], slr_rf_result$rf[slr_rf_result$df_type=="test"])
+      
+      var_importance <- data.frame(var_name = rf_res$variable.importance %>% names, 
+                                   vi = rf_res$variable.importance %>% as.numeric())
+      var_importance <- var_importance[with(var_importance, order(-vi)), ]
+      ggplot(var_importance %>% top_n(20, vi))+
+         geom_col(aes(reorder(var_name, vi), vi),
+                  position = 'dodge', fill='khaki')+
+         coord_flip() +
+         theme_light()+
+         labs(x = 'variable', y = 'importance value (impurity)',
+              title = csv_name)+
+         theme(axis.title = element_text(size = 13),
+               axis.text = element_text(size = 13),
+               legend.title = element_text(size = 13),
+               legend.text = element_text(size = 13),
+               strip.text.y = element_text(size = 12))
       
       #-----------#f# GWR: train GWR--------
       #--------- RF: split data into train, validation, and test data--------
@@ -119,8 +183,8 @@ for(yr_i in seq_along(csv_names)){
       source("../EXPANSE_algorithm/scr/fun_plot_rf_vi.R")
       plot_rf_vi(csv_name_fold, var_no = 10)
       # Model Performance evaluation:
-      # slr_poll$eval_train %>% print()
-      # slr_poll$eval_test %>% print()
+      slr_poll$eval_train %>% print()
+      slr_poll$eval_test %>% print()
       # error_matrix(gwr_df[gwr_df$df_type=='train', 'obs'], gwr_df[gwr_df$df_type=='train', 'gwr']) %>% 
       #    print()
       # error_matrix(gwr_df[gwr_df$df_type=='test', 'obs'], gwr_df[gwr_df$df_type=='test', 'gwr']) %>% 
@@ -131,12 +195,12 @@ for(yr_i in seq_along(csv_names)){
       # # output all models' performance matrix
       output_em <- function(pred_df, csv_name, model, year, obs_name, pred_name){
          error_matrix(pred_df[pred_df$df_type=='train', 'obs'], pred_df[pred_df$df_type=='train', 'gwr'])
-
+         
          em <- rbind(error_matrix(pred_df[pred_df$df_type=='test', 'obs'], pred_df[pred_df$df_type=='test', model]) ,
                      error_matrix(pred_df[pred_df$df_type=='train', 'obs'], pred_df[pred_df$df_type=='train', model])) %>%
             as.data.frame()
          # em[, c(1, 5, 7)]
-
+         
          perf_matrix <- em %>% mutate(df_type=c('test','train'), model=model, n_fold=fold_i,
                                       csv_name=csv_name)
          perf_matrix
@@ -147,6 +211,6 @@ for(yr_i in seq_along(csv_names)){
       )
       write.csv(out_pm, paste0("data/workingData/perf_m_",csv_name_fold, '.csv'), row.names = F)
    }
-  
+   stopCluster(cl)
 } 
 
