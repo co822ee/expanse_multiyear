@@ -8,7 +8,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F, fig.width = 6, fig.height = 6, warning=F)
+knitr::opts_chunk$set(echo = F, fig.width = 6, fig.height = 4, warning=F)
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 library(kableExtra)
 ```
@@ -19,55 +19,65 @@ eu_bnd <- st_read("../expanse_shp/eu_expanse2.shp")
 
 ```{r read prediction results (5-fold test data)} 
 # Here we read the predictions for test data from all five-folds
-csv_names <- paste0('NO2_5cv_', paste0('run2_',c('08-10', '09-11', '10-12', '08-12')))
-years <- list(2008:2010, 2009:2011, 2010:2012, 2008:2012)
+
+csv_names <- paste0('NO2_5cv_run2_', c('08-10', '09-11', '10-12', 
+                              '08-12', '06-12', '05-12', '04-12'))   #2008:2012
+years <- list(2008:2010, 2009:2011, 2010:2012, 
+              2008:2012, 2006:2012, 2005:2012, 2004:2012)
 all_test <- lapply(paste0("data/workingData/", csv_names, ".csv"), read.csv)
 # lapply(all_test, nrow)
+```
+```{r}
+print(csv_names)
 ```
 
 The predictors used in SLR, GWR, RF were the same.
 
 ```{r predictors in LUR}
-source("../EXPANSE_algorithm/scr/fun_call_predictor.R")
-pred_c_rf <- c(pred_c, 'year', 'zoneID') #"x_trun", "y_trun"
-x_varname = names(all_test[[1]] %>% dplyr::select(matches(pred_c_rf)))
-print("Predictors used:")
-print(x_varname)
+source("src/00_fun_read_data.R")
+exc_names <- c("sta_code", "component_code", "component_caption", "obs", 
+                  "id", "country_name", "sta_type", "area_type", "areaid", 
+                  "index", "nfold", "xcoord", "ycoord")
+no2_e_09_11 <- subset_df_yrs(no2_e_all, 2010)   
+pred_c <- names(no2_e_09_11)[!(names(no2_e_09_11)%in%exc_names)]
+# pred_c_rf <- c(pred_c, 'year', 'zoneID') #"x_trun", "y_trun"
+# x_varname = names(all_test[[1]] %>% dplyr::select(matches(pred_c_rf)))
+# print("Predictors used:")
+print(pred_c)
+
 
 
 ```
 
 
-
-# Location
-
-The datasets were randomly divided into training and test data, using 'type_of_st' and 'climate_zone' as stratification.
 
 
 ```{r fig.height=6, fig.width=10}
-tmap_mode('plot')
-source("../EXPANSE_algorithm/scr/fun_read_data.R")
-maps_l <- lapply(seq_along(years), function(yr_i){
-   no2_e_09_11 <- subset_df_yrs(no2_e_all, years[[yr_i]])
-   # data_all <- no2_e_09_11
-   print(paste0("year: ", unique(no2_e_09_11$year)))
-   source("../EXPANSE_algorithm/scr/fun_create_fold.R")
-   data_all1 <- create_fold(no2_e_09_11, seed)
-   EU_sp <- st_as_sf(data_all1, coords = c("Xcoord", "Ycoord"))
-   st_crs(EU_sp) <- st_crs(3035)
-   
-   map_1 <- tm_shape(EU_sp) +
-      tm_dots(size = 0.05, col="nfold",   # col = "NO2",          # popup.vars for showing values
-              title = paste0('nfold in year ', unique(no2_e_09_11$year)), palette=viridis(5), style = "cat"  #,  palette=viridis(5), style=="fixed"
-      )+
-      tm_shape(eu_bnd)+
-      tm_borders()
-   map_1
-})
-do.call(tmap_arrange, maps_l)
+# tmap_mode('plot')
+# source("../EXPANSE_algorithm/scr/fun_read_data.R")
+# maps_l <- lapply(seq_along(years), function(yr_i){
+#    no2_e_09_11 <- subset_df_yrs(no2_e_all, years[[yr_i]])
+#    # data_all <- no2_e_09_11
+#    print(paste0("year: ", unique(no2_e_09_11$year)))
+#    source("../EXPANSE_algorithm/scr/fun_create_fold.R")
+#    data_all1 <- create_fold(no2_e_09_11, seed)
+#    EU_sp <- st_as_sf(data_all1, coords = c("Xcoord", "Ycoord"))
+#    st_crs(EU_sp) <- st_crs(3035)
+#    
+#    map_1 <- tm_shape(EU_sp) +
+#       tm_dots(size = 0.05, col="nfold",   # col = "NO2",          # popup.vars for showing values
+#               title = paste0('nfold in year ', unique(no2_e_09_11$year)), palette=viridis(5), style = "cat"  #,  palette=viridis(5), style=="fixed"
+#       )+
+#       tm_shape(eu_bnd)+
+#       tm_borders()
+#    map_1
+# })
+# do.call(tmap_arrange, maps_l)
 ```
 
 # Five-fold cross-validation
+
+The model performance remains similar despite the time period. But from the variable importance, we can see that the longer the time period, the year becomes an important variable. It shows the importance of considering temporal variations over a long period.
 
 
 ```{r}
@@ -76,11 +86,14 @@ do.call(tmap_arrange, maps_l)
 show_EM <- function(all_df_i){
    # gwr=all_test[[all_df_i]]$gwr
    slr=all_test[[all_df_i]]$slr
+   # slr_rf=all_test[[all_df_i]]$slr_rf
    rf=all_test[[all_df_i]]$rf
    df_all <- data.frame(slr=error_matrix(all_test[[all_df_i]]$obs, slr),
-           # gwr=error_matrix(all_test[[all_df_i]]$obs, gwr),
-           rf=error_matrix(all_test[[all_df_i]]$obs, rf),
-           yr=csv_names[[all_df_i]])[c(1,5,7),]
+                        # slr_rf=error_matrix(all_test[[all_df_i]]$obs, slr_rf),
+                        # gwr=error_matrix(all_test[[all_df_i]]$obs, gwr),
+                        rf=error_matrix(all_test[[all_df_i]]$obs, rf),
+                        yr=lapply(strsplit(csv_names[[all_df_i]], "_"), 
+                                  `[[`, 4)[[1]])[c(1,5,7),]
    df_all$EM = row.names(df_all)
    df_all
 }
@@ -90,11 +103,11 @@ ggplot(em_df %>% filter(EM=='rsq') %>%  gather("model", "values", -c("yr", "EM")
       geom_bar(stat="identity", position = "dodge2")+
       # facet_grid(EM~., scales ='free')+
       # labs(title=years[[i]])+
-      theme(axis.title = element_text(size = 18),
-          axis.text = element_text(size = 16),
-          legend.title = element_text(size = 16),
-          legend.text = element_text(size = 16),
-          strip.text.y = element_text(size = 15))
+     theme(axis.title = element_text(size = 13),
+            axis.text = element_text(size = 11),
+            legend.title = element_text(size = 13),
+            legend.text = element_text(size = 13),
+            strip.text.y = element_text(size = 12))
 
 # ggplot(perfm)+
 #       geom_boxplot(aes(x=model, y=rsq))+
@@ -132,15 +145,30 @@ comp_rf_slr <- function(csv_i){
            title = paste0(yr, "_fold_", nfold))+
       # facet_grid(EM~., scales ='free')+
       # labs(title=years[[i]])+
-      theme(axis.title = element_text(size = 18),
-            axis.text = element_text(size = 16),
-            legend.title = element_text(size = 16),
-            legend.text = element_text(size = 16),
-            strip.text.y = element_text(size = 15))
+      theme(axis.title = element_text(size = 11),
+            axis.text = element_text(size = 11),
+            legend.title = element_text(size = 11),
+            legend.text = element_text(size = 11),
+            strip.text.y = element_text(size = 11))
    # rf_vi <- read.csv(paste0("data/workingData/", rf_name))
    source("../EXPANSE_algorithm/scr/fun_plot_rf_vi.R")
    p2 <- plot_rf_vi(paste0("run2_", yr, "_fold_", nfold), var_no = 20)
-   grid.arrange(p1, p2, nrow=1)
+   
+   # var_importance <- read.csv(paste0("data/workingData/slr_rf_vi_run2_", yr, "_fold_", nfold, ".csv"))
+   # p3 <- ggplot(var_importance %>% top_n(20, vi))+
+   #       geom_col(aes(reorder(var_name, vi), vi),
+   #                position = 'dodge', fill='khaki')+
+   #       coord_flip() +
+   #       theme_light()+
+   #       labs(x = 'variable', y = 'importance value (impurity)',
+   #            title = slr_name)+
+   #       theme(axis.title = element_text(size = 13),
+   #             axis.text = element_text(size = 13),
+   #             legend.title = element_text(size = 13),
+   #             legend.text = element_text(size = 13),
+   #             strip.text.y = element_text(size = 12))
+   # grid.arrange(p1, p2, p3, nrow=2, ncol=2)
+   grid.arrange(p1, p2, nrow=1, ncol=2)
 }
 
 # comp_rf_slr(4)
@@ -167,11 +195,11 @@ ggplot(perfmm, aes(x=run, y=rsq, fill=nfold, group=nfold))+
     geom_bar(stat="identity", position = "dodge2")+
       facet_grid(model~., scales ='free')+
       # labs(title=years[[i]])+
-      theme(axis.title = element_text(size = 18),
-          axis.text = element_text(size = 16),
-          legend.title = element_text(size = 16),
-          legend.text = element_text(size = 16),
-          strip.text.y = element_text(size = 15))
+      theme(axis.title = element_text(size = 12),
+          axis.text = element_text(size = 11),
+          legend.title = element_text(size = 11),
+          legend.text = element_text(size = 11),
+          strip.text.y = element_text(size = 11))
 ```
 
 

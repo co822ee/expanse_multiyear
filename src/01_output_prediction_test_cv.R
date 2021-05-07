@@ -14,8 +14,8 @@ write_output_5csv <- function(year_i){
    # list.files("data/workingData/", paste0("GWR_result_all_", csv_names[year_i], "_fold"))
    slr <- lapply(paste0("data/workingData/SLR_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv"),
                  read.csv)
-   slr_rf <- lapply(paste0("data/workingData/slr_rf_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv"),
-                    read.csv)
+   # slr_rf <- lapply(paste0("data/workingData/slr_rf_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv"),
+   #                  read.csv)
    # gwr <- lapply(paste0("data/workingData/GWR_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv"),
    #               read.csv)
    rf <- lapply(paste0("data/workingData/RF_result_all_", csv_names[year_i], "_fold_", seq(1,nfold), ".csv"),

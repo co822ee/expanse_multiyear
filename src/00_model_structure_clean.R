@@ -1,4 +1,5 @@
 # This script run the three models for multiple single years or multiple years
+# 07052021 Run the code and include zoneID and cntr_code and year for SLR
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 source("src/00_fun_read_data.R")
 # Whether to tune RF
@@ -18,10 +19,11 @@ for(yr_i in seq_along(csv_names)){
    print("********************************************")
    print(csv_name)
    no2_e_09_11 <- subset_df_yrs(no2_e_all, years[[yr_i]])
-   ex_var <- c("id", "sta_code", "cntr_code", "country_name", 
-               "sta_type", "area_type", "areaid", "xcoord", "ycoord",
-               "zoneID", "obs", "component_code", "component_caption", "year")
-   pred_c <- names(no2_e_09_11)[!(names(no2_e_09_11)%in%ex_var)]
+   exc_names <- c("sta_code", "component_code", "component_caption", "obs", 
+                  "id", "country_name", "sta_type", "area_type", "areaid", 
+                  "index", "nfold", "xcoord", "ycoord")
+   
+   pred_c <- names(no2_e_09_11)[!(names(no2_e_09_11)%in%exc_names)]
    # data_all <- no2_e_09_11
    print(paste0("year: ", unique(no2_e_09_11$year)))
    # numbers of observations for every year
