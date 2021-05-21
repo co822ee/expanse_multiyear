@@ -1,0 +1,7 @@
+library(dplyr)
+airbase <- read.csv("../EXPANSE_APM/data/processed/ab_v8_yr_checked.csv")
+ab_sta <- read.csv("../EXPANSE_APM/data/processed/ab_v8_meta_checked.csv")
+ab_sta <- ab_sta %>% select(Xcoord, Ycoord, station_european_code, sta_type)
+no2 <- airbase %>% filter(component_caption=="NO2")
+no2 <- inner_join(no2, ab_sta, by="station_european_code")
+write.csv(no2, "../EXPANSE_APM/data/processed/ab_v8_no2_yr_checked.csv", row.names = F)
