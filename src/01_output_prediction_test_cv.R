@@ -1,12 +1,14 @@
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 source("src/00_fun_read_data.R")
 # Multiple single years
-csv_names <- paste0('run2_',c('08-10', '09-11', '10-12',
-                              '08-12', '06-12', '05-12', '04-12'))   #2008:2012
-years <- list(2008:2010, 2009:2011, 2010:2012,
-              2008:2012, 2006:2012, 2005:2012, 2004:2012)
-# year_i=1
-csv_names
+target_poll <- 'NO2'
+
+csv_names <- paste0('o2_',target_poll, "_",c('08-10', '09-11', '10-12', 
+                                             '08-12', '06-12', '12-18', '00-19'))   #2008:2012
+years <- list(2008:2010, 2009:2011, 2010:2012, 
+              2008:2012, 2006:2012, 2012:2018, 2000:2019)
+# list.files('data/workingData/', paste0('SLR_result_all_o2_', target_poll))
+
 nfold=5
 
 write_output_5csv <- function(year_i){
@@ -32,7 +34,7 @@ write_output_5csv <- function(year_i){
    rf_test <- do.call(rbind, rf_test)
 
    all_test <- cbind(rf=rf_test$rf, slr_test)  #gwr=gwr_test$gwr  #slr_rf=slr_rf_test$slr_rf,
-   write.csv(all_test, paste0("data/workingData/NO2_5cv_", csv_names[year_i], ".csv"))
+   write.csv(all_test, paste0("data/workingData/5cv_", csv_names[year_i], ".csv"))
 
 }
 lapply(seq_along(csv_names), write_output_5csv)
