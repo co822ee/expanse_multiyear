@@ -1,21 +1,20 @@
 # This script output the observation csv files for multiple single years or multiple years
 #
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
-target_poll <- 'PM2.5'
-source("src/00_fun_read_data.R")
-# Whether to tune RF
-tuneRF = F
-
+seed <- 123
+target_poll <- 'NO2'
+sta <- read.csv("../EXPANSE_predictor//data/processed/all_sta_climate.csv")
+airbase <- read.csv("../EXPANSE_APM/data/processed/all_conc4.csv")
+ap_all <- inner_join(airbase, sta, by='sta_code')
 
 
 # Multiple years
-csv_names <- paste0('run2_',c('08-10', '09-11', '10-12', 
-                              '08-12', '06-12', '05-12', '04-12', 
+csv_names <- paste0('run2_',c('08-10', '09-11', '10-12', '06-12', '13-18', '06-18', '00-18',
                               paste(rep('0', 10), seq(0, 9, 1) %>% as.character(), sep = ""), 
-                              seq(10, 12, 1)))   #2008:2012
+                              seq(10, 18, 1)))   #2008:2012
 years <- list(2008:2010, 2009:2011, 2010:2012, 
-              2008:2012, 2006:2012, 2005:2012, 2004:2012)
-years <- c(years, as.list(seq(2000, 2012)))
+              2006:2012, 2013:2018, 2006:2018, 2000:2018)
+years <- c(years, as.list(seq(2000, 2018)))
 multiple <- data.frame()
 oneyear <- data.frame()
 for(yr_i in seq_along(csv_names)){
@@ -29,7 +28,7 @@ for(yr_i in seq_along(csv_names)){
    }
    if(!dir.exists(outputDir)) dir.create(outputDir)
    if(!file.exists(paste0(outputDir, csv_name, '_', target_poll,".csv"))){
-      no2_e_09_11 <- subset_df_yrs(no2_e_all, years[[yr_i]])
+      no2_e_09_11 <- ap_all %>% filter(year%in%years[[yr_i]], component_caption==target_poll)
       # data_all <- no2_e_09_11
       print(paste0("year: ", unique(no2_e_09_11$year)))
       
@@ -61,8 +60,8 @@ for(yr_i in seq_along(csv_names)){
    }
    
 } 
-# write.csv(oneyear, paste0('data/processed/gee/singleyear_', target_poll, '.csv'), row.names = F)
-# write.csv(multiple, paste0('data/processed/gee/multiyear_', target_poll, '.csv'), row.names = F)
+write.csv(oneyear, paste0('data/processed/gee/singleyear_', target_poll, '.csv'), row.names = F)
+write.csv(multiple, paste0('data/processed/gee/multiyear_', target_poll, '.csv'), row.names = F)
 
 library(dplyr)
 read.csv(paste0('data/processed/gee/multiyear_', target_poll, '.csv'))$csvname %>% unique
