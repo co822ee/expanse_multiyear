@@ -10,9 +10,9 @@ tuneRF = F
 
 # Multiple years
 csv_names <- paste0('o2_',target_poll, "_",c('08-10', '09-11', '10-12', 
-                              '08-12', '06-12', '12-18', '00-19'))   #2008:2012
+                              '08-12', '06-12', '12-18', '00-18'))   #2008:2012
 years <- list(2008:2010, 2009:2011, 2010:2012, 
-              2008:2012, 2006:2012, 2012:2018, 2000:2019)
+              2008:2012, 2006:2012, 2012:2018, 2000:2018)
 library(doParallel)
 library(foreach)
 
@@ -24,7 +24,7 @@ for(yr_i in seq_along(csv_names)){
    no2_e_09_11 <- subset_df_yrs(no2_e_all, years[[yr_i]], target_poll)
    exc_names <- c("sta_code", "component_code", "component_caption", "obs", 
                   "id", "country_name", "sta_type", "area_type", "areaid", 
-                  "index", "nfold", "xcoord", "ycoord")
+                  "index", "nfold", "xcoord", "ycoord") #'cntr_code','zoneID'
    
    pred_c <- names(no2_e_09_11)[!(names(no2_e_09_11)%in%exc_names)]
    # data_all <- no2_e_09_11
@@ -51,7 +51,7 @@ for(yr_i in seq_along(csv_names)){
          #f# SLR: define/preprocess predictors (direction of effect)
          source("../EXPANSE_algorithm/scr/fun_slr_proc_in_data.R")
          data_all <- proc_in_data(data_all1, neg_pred, "xcoord", "ycoord")
-         data_all <- data_all[!is.na(data_all$sat_pm25), ]
+         if(target_poll=='PM2.5') data_all <- data_all[!is.na(data_all$sat_pm25), ]
          test_sub <- data_all[data_all$nfold==fold_i,]
          train_sub <- data_all[-test_sub$index, ] #data_all1$index starts from 1 to the length.
          
@@ -170,7 +170,7 @@ for(yr_i in seq_along(csv_names)){
          # test_df <- data_all[index$test, ]
          train_df <- train_sub
          test_df <- test_sub
-         pred_c_rf <- c(pred_c, "year", "zoneID") #"x_trun", "y_trun"
+         pred_c_rf <- c(pred_c, "year", "zoneID", 'cntr_code') #"x_trun", "y_trun"
          x_varname = names(data_all %>% dplyr::select(matches(pred_c_rf)))
          print("RF predictors:")
          print(x_varname)
