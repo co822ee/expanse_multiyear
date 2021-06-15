@@ -237,6 +237,5 @@ for(yr_i in seq_along(csv_names)){
    }else{
       print('not enough data')
    }
-   
 } 
 
