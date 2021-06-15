@@ -103,6 +103,7 @@ subset_df_yrs <- function(obs_df, yr_target, target_poll='NO2'){
                rename(sat_pm25=paste0("satPM25_",yr_target_close))
          }
          no2_e_sub <- inner_join(no2_e_sub, sat_target, by="sta_code")
+         no2_e_sub <- no2_e_sub[!is.na(no2_e_sub$sat_pm25), ]
       }
       # Add met
       if(all(yr_target%in%met_yr)){
@@ -196,6 +197,7 @@ subset_df_yrs <- function(obs_df, yr_target, target_poll='NO2'){
                                             by='sta_code')
                               }
          ) %>% do.call(rbind, .)
+         no2_e_sub <- no2_e_sub[!is.na(no2_e_sub$sat_pm25),]
       }
       # Add met
       
@@ -211,8 +213,6 @@ subset_df_yrs <- function(obs_df, yr_target, target_poll='NO2'){
       names(met_target) <- met_var
       # identical(no2_e_sub_s$sta_code, no2_e_sub$sta_code)
       no2_e_sub <- cbind(no2_e_sub, met_target)
-      
-      
    }
    no2_e_sub %>% mutate(cntr_code=factor(cntr_code), year=factor(year),
                         zoneID=factor(zoneID))
