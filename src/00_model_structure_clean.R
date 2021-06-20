@@ -3,16 +3,17 @@
 # 03062021 Run the code and include zoneID as a predictor and without tuning RF
 target_poll <- 'NO2'
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
-source("src/00_fun_read_data.R")
+# source("src/00_fun_read_data.R")
+source("src/00_fun_read_data_gee.R")
 # Whether to tune RF
-tuneRF = F
+tuneRF = T
 # Multiple single years
 
 # Multiple years
 csv_names <- paste0('o2_',target_poll, "_",c('08-10', '09-11', '10-12', 
-                              '08-12', '06-12', '12-18', '00-18'))   #2008:2012
+                                              '08-12', '06-12', '12-19', '00-19'))   #2008:2012
 years <- list(2008:2010, 2009:2011, 2010:2012, 
-              2008:2012, 2006:2012, 2012:2018, 2000:2018)
+              2008:2012, 2006:2012, 2012:2018, 2000:2019)
 library(doParallel)
 library(foreach)
 
@@ -20,19 +21,22 @@ for(yr_i in seq_along(csv_names)){
    csv_name <- csv_names[yr_i]
    print("********************************************")
    print(csv_name)
-   no2_e_all <- read_APdata(target_poll)
-   no2_e_09_11 <- subset_df_yrs(no2_e_all, years[[yr_i]], target_poll)
-   exc_names <- c("sta_code", "component_code", "component_caption", "obs", 
-                  "id", "country_name", "sta_type", "area_type", "areaid", 
-                  "index", "nfold", "xcoord", "ycoord") #'cntr_code','zoneID'
    
-   pred_c <- names(no2_e_09_11)[!(names(no2_e_09_11)%in%exc_names)]
-   # data_all <- no2_e_09_11
-   print(paste0("year: ", unique(no2_e_09_11$year)))
-   if(nrow(no2_e_09_11)>200){
+   df_sub <- read_data(target_poll,  years[[yr_i]])
+   if(length(years[[yr_i]])==1){
+      exc_names <- c('system.index', 'obs', 'sta_code', 'component_caption', '.geo', 'year', 
+                     'cntr_code', 'xcoord', 'ycoord', 'sta_type')
+   }else{
+      exc_names <- c('system.index', 'obs', 'sta_code', 'component_caption', '.geo',
+                     'cntr_code', 'xcoord', 'ycoord', 'sta_type')
+   }
+   pred_c <- names(df_sub)[!(names(df_sub)%in%exc_names)]
+   
+   print(paste0("year: ", unique(df_sub$year)))
+   if(nrow(df_sub)>200){
       source("src/00_fun_create_fold.R")
       # The stations will only be included in one specific fold.
-      data_all1 <- create_fold(no2_e_09_11, seed, strt_group=c("n_obs", "sta_type", "zoneID"), 
+      data_all <- create_fold(df_sub, seed, strt_group=c("n_obs", "sta_type", "zoneID"), 
                                multiyear_group = c("sta_code", "year"),
                                nfold = 5)
       
@@ -45,12 +49,7 @@ for(yr_i in seq_along(csv_names)){
          source('../EXPANSE_algorithm/scr/fun_call_lib.R')
          csv_name_fold <- paste0(csv_name, "_fold_", fold_i)
          
-         #f# SLR: select predictors
-         # source("../EXPANSE_algorithm/scr/o_00_01_call_predictor.R")
-         neg_pred <- pred_c[grepl("nat|ugr", pred_c)]
-         #f# SLR: define/preprocess predictors (direction of effect)
-         source("../EXPANSE_algorithm/scr/fun_slr_proc_in_data.R")
-         data_all <- proc_in_data(data_all1, neg_pred, "xcoord", "ycoord")
+         
          if(target_poll=='PM2.5') data_all <- data_all[!is.na(data_all$sat_pm25), ]
          test_sub <- data_all[data_all$nfold==fold_i,]
          train_sub <- data_all[-test_sub$index, ] #data_all1$index starts from 1 to the length.
