@@ -1,6 +1,10 @@
 # This script run the three models for multiple single years or multiple years
 # 07052021 Run the code and include zoneID and cntr_code and year for SLR
 # 03062021 Run the code and include zoneID as a predictor and without tuning RF
+# 20062021 Run the code and include zoneID as a predictor and tune RF (o3_) (Overnight 06/20 NO2)
+# Need to rerun SLR for NO2 and PM2.5 (add year indicator in the final step.)
+# undergoing NO2, PM2.5
+
 target_poll <- 'NO2'
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 # source("src/00_fun_read_data.R")
@@ -10,10 +14,10 @@ tuneRF = T
 # Multiple single years
 
 # Multiple years
-csv_names <- paste0('o2_',target_poll, "_",c('08-10', '09-11', '10-12', 
+csv_names <- paste0('all_',target_poll, "_",c('08-10', '09-11', '10-12', 
                                               '08-12', '06-12', '12-19', '00-19'))   #2008:2012
 years <- list(2008:2010, 2009:2011, 2010:2012, 
-              2008:2012, 2006:2012, 2012:2018, 2000:2019)
+              2008:2012, 2006:2012, 2012:2019, 2000:2019)
 library(doParallel)
 library(foreach)
 
@@ -44,15 +48,11 @@ for(yr_i in seq_along(csv_names)){
       cluster_no <- 5
       cl <- parallel::makeCluster(cluster_no)
       doParallel::registerDoParallel(cl)
-      foreach(fold_i = seq_along(unique(data_all1$nfold)))  %dopar%  {
-         
+      foreach(fold_i = seq_along(unique(data_all$nfold)))  %dopar%  {
          source('../EXPANSE_algorithm/scr/fun_call_lib.R')
          csv_name_fold <- paste0(csv_name, "_fold_", fold_i)
-         
-         
-         if(target_poll=='PM2.5') data_all <- data_all[!is.na(data_all$sat_pm25), ]
          test_sub <- data_all[data_all$nfold==fold_i,]
-         train_sub <- data_all[-test_sub$index, ] #data_all1$index starts from 1 to the length.
+         train_sub <- data_all[-test_sub$index, ] #data_all$index starts from 1 to the length.
          
          #------------------Above code is needed for all algorithms----------------------
          #---------#f# SLR: train SLR -----------
@@ -63,11 +63,16 @@ for(yr_i in seq_along(csv_names)){
          slr_result <- slr(train_sub$obs, train_sub %>% dplyr::select(x_var) %>% as.data.frame(),
                            cv_n = csv_name_fold, R2thres = ifelse(target_poll=='PM2.5', 0.0, 0.01))
          slr_model <- slr_result[[3]]
-         # train_sub$year <- as.numeric(train_sub$year)
-         # lm(as.formula(paste0('obs~', paste(names(coefficients(slr_model))[-1], collapse = '+'), '+year')), train_sub) %>% summary
-         # lm(as.formula(paste0('obs~', paste(names(coefficients(slr_model))[-1], collapse = '+'), '+year')), train_sub) %>% summary
-         #f# SLR: test SLR
-         # source("../EXPANSE_algorithm/scr/fun_output_slr_result.R")
+         ### new: Add year for multiple year modelling
+         slr_model <- lm(as.formula(paste0('obs~', paste(c(names(slr_model$coefficients[-1]), 'year'), collapse = '+'))),
+                         data = train_sub)
+         slr_model %>% summary
+         slr_output <- summary(slr_model)$coefficients %>% as.data.frame()
+         slr_output <- cbind(row.names(slr_output), slr_output)
+         slr_output[1,1] <- 'Final'
+         colnames(slr_output) <- c("variables", "beta", "Std.Error", "t", "P")
+         write.csv(slr_output, paste0('data/workingData/SLR_summary_model_year_', csv_name, '.csv'), row.names=F)
+         
          source("../EXPANSE_algorithm/scr/fun_gen_pred_df.R")
          output_slr_result <- function(model, test_df, train_df, output_filename, obs_varname,
                                        outputselect = c("station_european_code", "slr", "obs", "res", 
@@ -94,72 +99,7 @@ for(yr_i in seq_along(csv_names)){
          
          slr_poll$eval_train %>% print()
          slr_poll$eval_test %>% print()
-         # Force adding other predictors
-         # eq_slr <- paste0("obs~", paste(c(names(slr_model$coefficients)[-1],
-         #                                  "omi", "zoneID", "year"), collapse = "+")) %>% as.formula()
-         # 
-         # slr_2 <- lm(eq_slr, train_sub)  # exclude OMI because the coefficient is negative
-         # eq_slr <- paste0("obs~", paste(c(names(slr_model$coefficients)[-1],
-         #                                  "zoneID", "year"), collapse = "+")) %>% as.formula()
-         # 
-         # slr_2 <- lm(eq_slr, train_sub)  # exclude OMI because the coefficient is negative
-         # data_all2 <- rbind(train_sub %>% mutate(df_type='train'), 
-         #                    test_sub %>% mutate(df_type='test'))
-         # poll2 <- gen_pred_df(slr_2, data_all2, "obs")
-         # error_matrix(poll2[poll2$df_type=="train", "obs"], poll2$slr[poll2$df_type=="train"])
-         # error_matrix(poll2[poll2$df_type=="test", "obs"], poll2$slr[poll2$df_type=="test"])
-         # 
-         # #f# SLR: predict residual using omi
-         # slr_df2 <- inner_join(slr_df, data_all, by=c("station_european_code", "year", "obs", "nfold", "index"))
-         # # Method 1: lm
-         # lm_res <- lm(as.formula(paste0("res~omi+zoneID+year")), slr_df2[slr_df2$df_type=="train", ])
-         # lm_res %>% summary
-         # slr_poll2 <- data.frame(slr = (predict(lm_res, slr_df2) %>% as.numeric())+slr_df2$slr,
-         #                         obs = slr_df2[, "obs"]) %>% 
-         #    mutate(res = obs - slr) %>% 
-         #    cbind(slr_df2 %>% dplyr::select(-all_of("obs")))
-         # 
-         # error_matrix(slr_poll2[slr_poll2$df_type=="train", "obs"], slr_poll2$slr[slr_poll2$df_type=="train"])
-         # error_matrix(slr_poll2[slr_poll2$df_type=="test", "obs"], slr_poll2$slr[slr_poll2$df_type=="test"])
-         # Method 2: RF
-         # rf_res <- ranger(
-         #    formula = as.formula(paste0("res~", paste(x_var, collapse = "+"))),
-         #    data = slr_df2[slr_df2$df_type=="train", ],
-         #    num.trees = 500,
-         #    seed = seed,
-         #    importance = 'impurity'          # 'permutation'
-         # )
-         # 
-         # slr_rf_result <- data.frame(slr_rf = (predict(rf_res, slr_df2) %>% predictions()) + slr_df2$slr,
-         #                             obs = slr_df2[, "obs"]) %>% 
-         #    mutate(res = obs - slr_rf) %>% 
-         #    cbind(slr_df2 %>% dplyr::select(-all_of("obs"))) 
-         # write.csv(slr_rf_result, 
-         #           paste0("data/workingData/slr_rf_result_all_", csv_name_fold, ".csv"),
-         #           row.names = F)
-         # 
-         # error_matrix(slr_rf_result[slr_rf_result$df_type=="train", "obs"], slr_rf_result$slr_rf[slr_rf_result$df_type=="train"])
-         # error_matrix(slr_rf_result[slr_rf_result$df_type=="test", "obs"], slr_rf_result$slr_rf[slr_rf_result$df_type=="test"])
-         # 
-         # var_importance <- data.frame(var_name = rf_res$variable.importance %>% names, 
-         #                              vi = rf_res$variable.importance %>% as.numeric())
-         # var_importance <- var_importance[with(var_importance, order(-vi)), ]
-         # ggplot(var_importance %>% top_n(20, vi))+
-         #    geom_col(aes(reorder(var_name, vi), vi),
-         #             position = 'dodge', fill='khaki')+
-         #    coord_flip() +
-         #    theme_light()+
-         #    labs(x = 'variable', y = 'importance value (impurity)',
-         #         title = csv_name)+
-         #    theme(axis.title = element_text(size = 13),
-         #          axis.text = element_text(size = 13),
-         #          legend.title = element_text(size = 13),
-         #          legend.text = element_text(size = 13),
-         #          strip.text.y = element_text(size = 12))
-         # write.csv(var_importance, 
-         #           paste0("data/workingData/slr_rf_vi_", csv_name_fold, ".csv"), 
-         #           row.names = F)
-         #-----------#f# GWR: train GWR--------
+         
          #--------- RF: split data into train, validation, and test data--------
          print("--------------- RF ---------------")
          set.seed(seed)
@@ -169,7 +109,7 @@ for(yr_i in seq_along(csv_names)){
          # test_df <- data_all[index$test, ]
          train_df <- train_sub
          test_df <- test_sub
-         pred_c_rf <- c(pred_c, "year", "zoneID", 'cntr_code') #"x_trun", "y_trun"
+         pred_c_rf <- c(pred_c, "year", "zoneID") #"x_trun", "y_trun"
          x_varname = names(data_all %>% dplyr::select(matches(pred_c_rf)))
          print("RF predictors:")
          print(x_varname)
@@ -179,7 +119,7 @@ for(yr_i in seq_along(csv_names)){
             #f# RF: tune hyperparameter
             hyper_grid <- expand.grid(
                mtry = seq(floor(sqrt(length(x_varname))), length(x_varname), by=20),
-               ntrees = seq(500,1000, by=200),
+               ntrees = seq(200,800, by=200),
                OOB_RMSE = 0,
                OOB_R2 = 0,
                valid_RMSE = 0,
@@ -237,4 +177,4 @@ for(yr_i in seq_along(csv_names)){
       print('not enough data')
    }
 } 
-
+  
