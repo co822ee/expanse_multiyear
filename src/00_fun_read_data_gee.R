@@ -7,7 +7,8 @@ read_data <- function(target_poll, yr){
    if(target_poll=='PM2.5'){
       df_all <- read.csv('../EXPANSE_predictor/data/raw/gee/pred_pm25All.csv')
    }else if(target_poll=='NO2'){
-      df_all <- read.csv('../EXPANSE_predictor/data/raw/gee/pred_no2All.csv')
+      df_all <- read.csv('../EXPANSE_predictor/data/raw/gee/pred_no2All.csv') %>% 
+         filter(obs<=500)
    }
    # Read in station metadata
    sta <- read.csv("../EXPANSE_APM/data/processed/all_sta.csv")
@@ -15,5 +16,6 @@ read_data <- function(target_poll, yr){
    # Remove them
    sta <- sta %>% filter(sta_type!="Unknown", sta_type!="")
    df_all_subset <- df_all %>% filter(year%in%yr)
+   df_all_subset$year <- as.factor(df_all_subset$year)
    inner_join(df_all_subset, sta, by='sta_code')
 }
