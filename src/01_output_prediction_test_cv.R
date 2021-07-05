@@ -1,11 +1,11 @@
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
-source("src/00_fun_read_data.R")
+source("src/00_fun_read_data_gee.R")
 # Multiple single years
 target_poll <- 'PM2.5'
-csv_names <- paste0('o2_',target_poll, "_",c('08-10', '09-11', '10-12', 
-                                              '08-12', '06-12', '12-18', '00-18'))   #2008:2012
+csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12', 
+                                             '08-12', '06-12', '12-19', '00-19'))   #2008:2012
 years <- list(2008:2010, 2009:2011, 2010:2012, 
-              2008:2012, 2006:2012, 2012:2018, 2000:2018)
+              2008:2012, 2006:2012, 2012:2019, 2000:2019)
 # list.files('data/workingData/', paste0('SLR_result_all_o2_', target_poll))
 
 nfold=5

@@ -3,7 +3,7 @@
 # 03062021 Run the code and include zoneID as a predictor and without tuning RF
 # 20062021 Run the code and include zoneID as a predictor and tune RF (o3_) (Overnight 06/20 NO2)
 # Need to rerun SLR for NO2 and PM2.5 (add year indicator in the final step.)
-# undergoing NO2, PM2.5
+# done: NO2, PM2.5
 
 target_poll <- 'NO2'
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
@@ -14,7 +14,7 @@ tuneRF = T
 # Multiple single years
 
 # Multiple years
-csv_names <- paste0('all_',target_poll, "_",c('08-10', '09-11', '10-12', 
+csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12', 
                                               '08-12', '06-12', '12-19', '00-19'))   #2008:2012
 years <- list(2008:2010, 2009:2011, 2010:2012, 
               2008:2012, 2006:2012, 2012:2019, 2000:2019)
