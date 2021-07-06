@@ -4,7 +4,7 @@ library(gtools)
 library(reshape2)
 library(ggplot2)
 library(GGally)
-target_poll <- 'PM'
+target_poll <- 'PM25'
 files <- list.files('data/processed/gee/', paste0('predictionsAll_', target_poll,'_'))
 no2 <- lapply(paste0('data/processed/gee/', files), read.csv)  #add a index
 no2 <- do.call(cbind, no2)
