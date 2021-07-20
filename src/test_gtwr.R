@@ -171,7 +171,10 @@ gtwr_model
 gtwr_coef <- gtwr_model$SDF
 gridded(gtwr_coef) <- T
 gtwr_coef <- stack(gtwr_coef)
-writeRaster(gtwr_coef, paste0('data/temp/test_gwr_coef_', csv_name, '_', gtwr_yr, '.tiff'))
+# Remove time_stamp (so that it would be easier to do modelling in gee)
+gtwr_coef <- dropLayer(gtwr_coef, nlayers(gtwr_coef))
+writeRaster(gtwr_coef, paste0('data/temp/test_gwr_coef_', csv_name, '_', gtwr_yr, '.tiff'),
+            overwrite=T)
 
 gtwr_model <- gtwr(eq, data=sp_train, st.bw=bw, regression.points = grd2, 
                    # st.dMat=stdMat,
