@@ -10,8 +10,8 @@ csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12',
 years <- list(2008:2010, 2009:2011, 2010:2012, 
               2008:2012, 2006:2012, 2012:2019, 2000:2019)
 nfold <- 5
-yr_i <- 7
-gtwr_yr <- 2010
+yr_i <- 6
+# gtwr_yr <- 2010
 csv_name <- csv_names[yr_i]
 print("********************************************")
 print(csv_name)
@@ -83,7 +83,7 @@ trainGTWR <- function(sp_train1, gtwr_yr, grid_i, sp_valid1, valid_sub1, target_
                          error=function(e) T)
    if(typeof(bw_gtwrYr)!='logical'){
       #------ 7) Use this optimized bandwidth to train the GTWR for each year with different parameters specified ------
-      gtwr_model <- gtwr(eq, data=sp_train1, st.bw=bw_gtwrYr, regression.points = grd2, 
+      gtwr_model <- tryCatch(gtwr(eq, data=sp_train1, st.bw=bw_gtwrYr, regression.points = grd2, 
                          # st.dMat=stdMat,
                          st.dMat=st.dist(dp.locat=coordinates(sp_train1), rp.locat=coordinates(grd2), 
                                          obs.tv=as.numeric(as.character(sp_train1@data$year)), 
@@ -96,8 +96,9 @@ trainGTWR <- function(sp_train1, gtwr_yr, grid_i, sp_valid1, valid_sub1, target_
                          t.units = 'year',
                          obs.tv=as.numeric(as.character(sp_train1@data$year)),   ## time stamps for the observation points
                          reg.tv=rep(gtwr_yr, nrow(coordinates(grd2))),     ## time stamps for the regression points
-                         adaptive=T, kernel='exponential')
-      if(!any(is.na(gtwr_model$SDF[1]$Intercept))){
+                         adaptive=T, kernel='exponential'), 
+                         error=function(e) T)
+      if(!any(is.na(gtwr_model$SDF[1]$Intercept))&typeof(gtwr_model)!='logical'){
          gtwr_valid <- gen_df_gtwr(gtwr_model, sp_valid_sub, valid_sub1)
          return(gtwr_valid)
       }else{
@@ -129,26 +130,26 @@ eq <- as.formula(paste0(obs_varname, '~',  paste(slr$variables[-1], collapse = "
 
 grd2 <- create_regressionGrid(eu_bnd, 200000, local_crs)
 # Create a grid of parameters (lamda & ksi)  using expand.grid
-gtwr_param <- expand.grid(lamda=seq(0, 1, 0.05), ksi=seq(0, pi/2, pi/16))
+gtwr_param <- expand.grid(lamda=seq(0, 1, 0.1), ksi=seq(0, pi/2, pi/8))
 
 #------ 4) Subset training data into training and validation data ------
-paramGrid_i <- 4  # Loop
-fold2_i <- 1  # Loop
+# paramGrid_i <- 4  # Loop
+# fold2_i <- 1  # Loop
 run_GTWR <- function(fold2_i, grid_i, yrs_v){
    print('------------------------------')
    print(paste0('fold ', fold2_i))
-   train_sub <- train_sub %>% dplyr::select(-c('nfold', 'n_obs', 'index'))
-   data_all2 <- create_fold(train_sub, seed, strt_group=c("n_obs", "sta_type", "zoneID"), 
+   train_sub2 <- train_sub %>% dplyr::select(-c('nfold', 'n_obs', 'index'))
+   data_all2 <- create_fold(train_sub2, seed, strt_group=c("n_obs", "sta_type", "zoneID"), 
                             multiyear_group = c("sta_code", "year"),
                             nfold = 5)
    valid_sub <- data_all2[data_all2$nfold==fold2_i,]
-   train_sub <- data_all2[-valid_sub$index, ] #data_all$index starts from 1 to the length.
+   train_sub2 <- data_all2[-valid_sub$index, ] #data_all$index starts from 1 to the length.
    
-   sp_train <- creat_spPoints(train_sub, 'xcoord', 'ycoord', local_crs)
+   sp_train2 <- creat_spPoints(train_sub2, 'xcoord', 'ycoord', local_crs)
    sp_valid <- creat_spPoints(valid_sub, 'xcoord', 'ycoord', local_crs)
    
    # Run the GTWR for all years in the period
-   gtwr_valid <- lapply(yrs_v, trainGTWR, sp_train1=sp_train, grid_i=grid_i,
+   gtwr_valid <- lapply(yrs_v, trainGTWR, sp_train1=sp_train2, grid_i=grid_i,
                         sp_valid1=sp_valid, valid_sub1=valid_sub, target_poll=target_poll) %>% do.call(rbind, .)  ## Should be the same size as validation data
    gtwr_valid
 }
@@ -158,13 +159,17 @@ run_GTWR <- function(fold2_i, grid_i, yrs_v){
 #------ 8) Evaluate the performance for GTWR model ------
 # Remove NA values for gtwr
 calibr_GTWR <- function(paramGrid_i, nfold, yrs_v){
+   print(paste0('paramGrid_i: ', paramGrid_i))
    gtwr_valid <- lapply(1:nfold, run_GTWR, grid_i=paramGrid_i, yrs_v) %>% do.call(rbind, .) ## should be the same size as data_all2
    gtwr_valid2 <- gtwr_valid[!is.na(gtwr_valid$gtwr), ]
-   cbind(t(error_matrix(gtwr_valid2$obs, gtwr_valid2$gtwr)), gtwr_param[paramGrid_i, ])
+   cbind(t(error_matrix(gtwr_valid2$obs, gtwr_valid2$gtwr)), 
+         gtwr_param[paramGrid_i, ],
+         data.frame(ndata=round(nrow(gtwr_valid2)/nrow(gtwr_valid)*100, 1)))
 }
 final_perfm <- lapply(1:(nrow(gtwr_param)), calibr_GTWR, nfold=nfold, yrs_v=years[[yr_i]])
+final_perfm2 <- final_perfm %>% do.call(rbind, .)
 
-
+write.csv(final_perfm2, paste0('data/processed/gtwr_param_', csv_name, '.csv'), row.names = F)
 #------ 9) Find the parameter set which gives the best RMSE/R2 ------
 
 # Save this parameter optimization results
