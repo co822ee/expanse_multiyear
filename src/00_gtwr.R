@@ -61,9 +61,13 @@ gen_df_gtwr <- function(gtwr_model, sp_p, df_p, forstepwise=F){
    gwr_test_df
 }
 ## Train GTWR for each year
-trainGTWR <- function(sp_train1, gtwr_yr, grid_i, sp_valid1, valid_sub1){
+trainGTWR <- function(sp_train1, gtwr_yr, grid_i, sp_valid1, valid_sub1, target_poll){
    print(paste0('gtwr_yr ', gtwr_yr))
-   sp_train_sub <- sp_train1[sp_train1$year==gtwr_yr,]
+   if(target_poll=='PM2.5'|target_poll=='PM10'){
+      sp_train_sub <- sp_train1[sp_train1$year%in%seq(gtwr_yr-1, gtwr_yr+1, 1),]
+   }else{
+      sp_train_sub <- sp_train1[sp_train1$year==gtwr_yr,]
+   }
    sp_valid_sub <- sp_valid1[sp_valid1$year==gtwr_yr,]
    valid_sub1 <- valid_sub1[valid_sub1$year==gtwr_yr,]
    #------ 6) Optimize the bandwidth for each year using the training data with different parameters specified ------
@@ -145,7 +149,7 @@ run_GTWR <- function(fold2_i, grid_i, yrs_v){
    
    # Run the GTWR for all years in the period
    gtwr_valid <- lapply(yrs_v, trainGTWR, sp_train1=sp_train, grid_i=grid_i,
-                        sp_valid1=sp_valid, valid_sub1=valid_sub) %>% do.call(rbind, .)  ## Should be the same size as validation data
+                        sp_valid1=sp_valid, valid_sub1=valid_sub, target_poll=target_poll) %>% do.call(rbind, .)  ## Should be the same size as validation data
    gtwr_valid
 }
 
