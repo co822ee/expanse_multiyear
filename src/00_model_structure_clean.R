@@ -3,9 +3,11 @@
 # 03062021 Run the code and include zoneID as a predictor and without tuning RF
 # 20062021 Run the code and include zoneID as a predictor and tune RF (o3_) (Overnight 06/20 NO2)
 # Need to rerun SLR for NO2 and PM2.5 (add year indicator in the final step.)
-# done: NO2, PM2.5
+# 2021/07/21 rerun SLR for NO2 and PM2.5 (add year indicator in the final step)
+## note: SLR_summary_model_year_ gives the one after adding year indicator at the final step
+# need to check the results: NO2, PM2.5
 
-target_poll <- 'NO2'
+target_poll <- 'PM2.5'
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 # source("src/00_fun_read_data.R")
 source("src/00_fun_read_data_gee.R")
@@ -35,7 +37,7 @@ for(yr_i in seq_along(csv_names)){
                      'cntr_code', 'xcoord', 'ycoord', 'sta_type')
    }
    pred_c <- names(df_sub)[!(names(df_sub)%in%exc_names)]
-   
+   pred_c <- pred_c[!pred_c%in%c('year', 'zoneID')]  ## exclude year first and then add it at the final stage for slr 
    print(paste0("year: ", unique(df_sub$year)))
    if(nrow(df_sub)>200){
       source("src/00_fun_create_fold.R")
@@ -71,7 +73,7 @@ for(yr_i in seq_along(csv_names)){
          slr_output <- cbind(row.names(slr_output), slr_output)
          slr_output[1,1] <- 'Final'
          colnames(slr_output) <- c("variables", "beta", "Std.Error", "t", "P")
-         write.csv(slr_output, paste0('data/workingData/SLR_summary_model_year_', csv_name, '.csv'), row.names=F)
+         write.csv(slr_output, paste0('data/workingData/SLR_summary_model_year_', csv_name_fold, '.csv'), row.names=F)
          
          source("../EXPANSE_algorithm/scr/fun_gen_pred_df.R")
          output_slr_result <- function(model, test_df, train_df, output_filename, obs_varname,

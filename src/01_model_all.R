@@ -1,6 +1,6 @@
 # This is a script to run the whole model and output results to GEE 
-## Ongoing: PM2.5
-## Finished: NO2
+# need to rerun SLR for NO2 and PM2.5 (add year indicator in the final step)
+
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 # Whether to tune RF
 target_poll = 'PM2.5'
@@ -29,6 +29,7 @@ for(yr_i in seq_along(csv_names)){
       exc_names <- c('system.index', 'obs', 'sta_code', 'component_caption', '.geo')
    }
    pred_c <- names(df_all)[!(names(df_all)%in%exc_names)]
+   pred_c <- pred_c[!pred_c%in%c('year', 'zoneID')]  ## exclude year first and then add it at the final stage for slr 
    # Don't need to do this because the sign of the predictor values is changed in GEE already
    # if(target_poll=='PM2.5'){
    #    neg_pred <- pred_c[grepl("clc14|clc7|precip", pred_c)]
