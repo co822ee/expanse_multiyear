@@ -2,7 +2,7 @@
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 # Whether to tune RF
 tuneRF_b = F
-target_poll = 'PM2.5'
+target_poll = 'NO2'
 obs_varname = 'obs'
 # Multiple single years
 csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12', 
@@ -78,11 +78,11 @@ get_stdMatrix <- function(dp, rp, rp_yr){
 # No regression points involved
 # stMat_dp <- get_stdMatrix(sp_train, sp_train, gtwr_yr)
 bw <- bw.gtwr(eq, sp_train, obs.tv=as.numeric(as.character(sp_train@data$year)),   # st.dMat
-              # st.dMat = st.dist(dp.locat = coordinates(sp_train), 
-              #                   obs.tv = as.numeric(as.character(sp_train@data$year)),
-              #                   lamda = 1),
+              st.dMat = st.dist(dp.locat = coordinates(sp_train),
+                                obs.tv = as.numeric(as.character(sp_train@data$year)),
+                                lamda=0.9, ksi=0.8),
               lamda = 0.9,
-              # ksi=0.5,
+              ksi=0.8,
               approach = 'CV', kernel = "exponential", adaptive = T)
 bw
 ## [1] 16
@@ -98,6 +98,13 @@ bw_gtwrYr <- bw.gtwr(eq, sp_train_sub, obs.tv=as.numeric(as.character(sp_train_s
         lamda = 0.9,
         approach = 'CV', kernel = "exponential", adaptive = T)
 ## [1] 39  (yr_i=2); 25 (yr_i=7)
+
+sp_train_sub <- sp_train[sp_train$year%in%seq(gtwr_yr-1, gtwr_yr+1, 1),]
+bw_gtwrYr <- bw.gtwr(eq, sp_train_sub, obs.tv=as.numeric(as.character(sp_train_sub@data$year)),   # st.dMat
+                     lamda = 0.9,
+                     approach = 'CV', kernel = "exponential", adaptive = T)
+
+
 sp_train_sub <- sp_train[sp_train$year==2009,]
 bw.gtwr(eq, sp_train_sub, obs.tv=as.numeric(as.character(sp_train_sub@data$year)),   # st.dMat
         lamda = 0.9,
@@ -221,6 +228,16 @@ for(gtwr_yr in years[[yr_i]]){
    # output stack of rasters (remove timestep)
    
 }
+source("../EXPANSE_algorithm/scr/fun_setupt_gwr.R")
+setup <- setup_gwr(train_sub, eu_bnd,
+                   cellsize = 200000, local_crs = local_crs, 
+                   xcoord="xcoord", ycoord="ycoord")
+DM <- setup[[3]]
+source("../EXPANSE_algorithm/scr/fun_gwr.R")
+gwr_model <- gwr(sp_train, grd2, DM, bw, paste0(csv_name, '_fold_', fold_i))
+
+plot_gwr_coef(fold_i, gwr_model, paste0(csv_name, '_fold_', fold_i), 
+              n_row = 3, n_col = 3, eu_bnd = eu_bnd)
 
 # Check the prediction values (validation)
 sp_test[i,]@data$year %>% as.numeric
