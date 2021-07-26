@@ -9,6 +9,8 @@ read_data <- function(target_poll, yr){
    }else if(target_poll=='NO2'){
       df_all <- read.csv('../EXPANSE_predictor/data/raw/gee/pred_no2All.csv') %>% 
          filter(obs<=500)
+   }else if(target_poll=='O3'){
+      df_all <- read.csv('../EXPANSE_predictor/data/raw/gee/pred_o3All.csv')
    }
    # Read in station metadata
    sta <- read.csv("../EXPANSE_APM/data/processed/all_sta.csv")
