@@ -1,9 +1,10 @@
+## Done: run for NO2 and PM2.5
 library(docstring)
 #------ 1) Read in data ------
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 library(doParallel)
 library(foreach)
-target_poll = 'NO2'
+target_poll = 'PM2.5'
 obs_varname = 'obs'
 nfold <- 5
 # Multiple single years
