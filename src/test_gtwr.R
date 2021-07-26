@@ -212,32 +212,50 @@ source('../EXPANSE_algorithm/scr/fun_plot_gwr_coef.R')
 plot_gwr_coef(fold_i, gtwr_model, 'gtwr_model2019',3,3,eu_bnd)
 plot_gwr_coef(fold_i, gtwr_model2, 'gtwr_model2000',3,3,eu_bnd)
 
+
 for(gtwr_yr in years[[yr_i]]){
-   gtwr_model_yr <- gtwr(eq, data=sp_train, st.bw=bw, regression.points = grd2, 
-                         # st.dMat=stdMat,
-                         st.dMat=st.dist(dp.locat=coordinates(sp_train), rp.locat=coordinates(grd2),
-                                         obs.tv=as.numeric(as.character(sp_train@data$year)),
-                                         reg.tv=rep(gtwr_yr, nrow(coordinates(grd2))),
-                                         lamda=0.9, ksi=0.8),
-                         lamda = 0.9, ksi=0.8,
-                         obs.tv=as.numeric(as.character(sp_train@data$year)),   ## time stamps for the observation points
-                         reg.tv=rep(gtwr_yr, nrow(coordinates(grd2))),     ## time stamps for the regression points
-                         adaptive=T, kernel='exponential')
-   plot_gwr_coef(fold_i, gtwr_model_yr, 
-                 paste0('gtwr_model_', gtwr_yr),3,3,eu_bnd)
-   # output stack of rasters (remove timestep)
+        sp_train_sub <- sp_train[sp_train$year==gtwr_yr,]
+        source("../EXPANSE_algorithm/scr/fun_setupt_gwr.R")
+        setup <- setup_gwr(sp_train_sub@data, eu_bnd,
+                           cellsize = 200000, local_crs = local_crs, 
+                           xcoord="xcoord", ycoord="ycoord")
+        DM <- setup[[3]]
+        bw_gtwrYr <- tryCatch(bw.gtwr(eq, sp_train_sub, obs.tv=as.numeric(as.character(sp_train_sub@data$year)),   # st.dMat
+                                      lamda = 0.1, ksi = 0, t.units = 'year',
+                                      approach = 'CV', kernel = "exponential", adaptive = T),
+                              error=function(e) T)
+        gtwr_model <- tryCatch(gtwr(eq, data=sp_train, st.bw=bw_gtwrYr, regression.points = grd2, 
+                                    # st.dMat=stdMat,
+                                    st.dMat=st.dist(dp.locat=coordinates(sp_train), rp.locat=coordinates(grd2), 
+                                                    obs.tv=as.numeric(as.character(sp_train@data$year)), 
+                                                    reg.tv=rep(gtwr_yr, nrow(coordinates(grd2))),
+                                                    lamda = 0.1, ksi = 0, 
+                                                    t.units = 'year'),
+                                    lamda = 0.1, ksi = 0, 
+                                    t.units = 'year',
+                                    obs.tv=as.numeric(as.character(sp_train@data$year)),   ## time stamps for the observation points
+                                    reg.tv=rep(gtwr_yr, nrow(coordinates(grd2))),     ## time stamps for the regression points
+                                    adaptive=T, kernel='exponential'), 
+                               error=function(e) T)
+        plot_gwr_coef(fold_i, gtwr_model, 
+                      paste0('gtwr_model_', gtwr_yr, '_', 'fold', 
+                             fold_i, target_poll),3,3,eu_bnd)
+        
+        
+        gwr_model <- gwr.basic(eq,
+                               data=sp_train_sub, 
+                               regression.points=grd2, 
+                               adaptive = T,
+                               bw=bw_gtwrYr, 
+                               dMat=DM,
+                               kernel='exponential')
+        plot_gwr_coef(fold_i, gwr_model, paste0('gwr_model_', gtwr_yr, '_', 'fold', 
+                                                fold_i, target_poll), 
+                      n_row = 3, n_col = 3, eu_bnd = eu_bnd)
    
 }
-source("../EXPANSE_algorithm/scr/fun_setupt_gwr.R")
-setup <- setup_gwr(train_sub, eu_bnd,
-                   cellsize = 200000, local_crs = local_crs, 
-                   xcoord="xcoord", ycoord="ycoord")
-DM <- setup[[3]]
-source("../EXPANSE_algorithm/scr/fun_gwr.R")
-gwr_model <- gwr(sp_train, grd2, DM, bw, paste0(csv_name, '_fold_', fold_i))
 
-plot_gwr_coef(fold_i, gwr_model, paste0(csv_name, '_fold_', fold_i), 
-              n_row = 3, n_col = 3, eu_bnd = eu_bnd)
+
 
 # Check the prediction values (validation)
 sp_test[i,]@data$year %>% as.numeric
