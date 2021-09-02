@@ -6,7 +6,7 @@
 # This needs to be reset to the original CreateSpacetimeFolds function
 # Cause the data from the same station from different years is included in both training data test data.
 create_fold <- function(data_df, seed, strt_group, multiyear_group = c("sta_code", "year"),
-                         nfold=5){
+                         nfold=5, m_var='m'){
    # data_df: the dataset you want to split for training and testing
    # seed: 123
    # strt_group: groups for stratification
@@ -20,7 +20,8 @@ create_fold <- function(data_df, seed, strt_group, multiyear_group = c("sta_code
    # numbers of observations for every year
    yrs <- unique(data_df$year)
    
-   if(length(yrs)!=1){
+   if(length(yrs)!=1|tryCatch(!is.null(data_df[, m_var]), error=function(e) FALSE)){   ## Either multiple year or monthly data
+      print('either subsetting for multiple-year or monthly data')
       # Obtain the number of observations for each monitoring station over time
       # poll_tbl <- with(data_df, table(sta_code, year)) 
       poll_tbl <- table(data_df[, multiyear_group])
@@ -91,7 +92,7 @@ create_fold <- function(data_df, seed, strt_group, multiyear_group = c("sta_code
    sapply(index_df, dim)
    index_df <- do.call(rbind, index_df)
    data_df2 <- inner_join(data_df2, index_df, by="index")
-   if(length(yrs)!=1){
+   if(length(yrs)!=1|tryCatch(!is.null(data_df[, m_var]), error=function(e) FALSE)){   ## Either multiple year or monthly data
       # Combine with the original multi-year data
       data_df2 <- inner_join(data_df, data_df2 %>% dplyr::select(sta_code, nfold, n_obs), by="sta_code")
       data_df2$index <- 1:nrow(data_df2)
