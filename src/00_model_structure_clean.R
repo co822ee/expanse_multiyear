@@ -7,22 +7,23 @@
 ## note: SLR_summary_model_year_ gives the one after adding year indicator at the final step
 # need to check the results: NO2, PM2.5
 
-target_poll <- 'PM2.5'
+
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 # source("src/00_fun_read_data.R")
 source("src/00_fun_read_data_gee.R")
 # Whether to tune RF
 tuneRF = T
 # Multiple single years
-
-# Multiple years
-csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12', 
-                                              '08-12', '06-12', '12-19', '00-19'))   #2008:2012
+target_poll <- c('PM2.5', 'PM10', 'NO2', 'O3')
+csv_names <- lapply(target_poll, function(poll_name){
+   paste0('o3_', poll_name, "_",c('08-10', '09-11', '10-12', 
+                                  '08-12', '06-12', '12-19', '00-19'))
+}) %>% unlist   #2008:2012
 years <- list(2008:2010, 2009:2011, 2010:2012, 
               2008:2012, 2006:2012, 2012:2019, 2000:2019)
 library(doParallel)
 library(foreach)
-
+## PM10 6:7 unfinished
 for(yr_i in seq_along(csv_names)){
    csv_name <- csv_names[yr_i]
    print("********************************************")
@@ -37,7 +38,7 @@ for(yr_i in seq_along(csv_names)){
                      'cntr_code', 'xcoord', 'ycoord', 'sta_type')
    }
    pred_c <- names(df_sub)[!(names(df_sub)%in%exc_names)]
-   pred_c <- pred_c[!pred_c%in%c('year', 'zoneID')]  ## exclude year first and then add it at the final stage for slr 
+   pred_c <- pred_c[!pred_c%in%c('year')]  ## exclude year first and then add it at the final stage for slr 
    print(paste0("year: ", unique(df_sub$year)))
    if(nrow(df_sub)>200){
       source("src/00_fun_create_fold.R")
@@ -61,7 +62,7 @@ for(yr_i in seq_along(csv_names)){
          source("../EXPANSE_algorithm/scr/fun_slr_for.R")
          # check the predictor variables
          print("SLR predictors:")
-         x_var <- train_sub %>% dplyr::select(matches(pred_c), "year", "zoneID") %>% names()
+         x_var <- train_sub %>% dplyr::select(matches(pred_c)) %>% names()
          slr_result <- slr(train_sub$obs, train_sub %>% dplyr::select(x_var) %>% as.data.frame(),
                            cv_n = csv_name_fold, R2thres = ifelse(target_poll=='PM2.5', 0.0, 0.01))
          slr_model <- slr_result[[3]]
@@ -112,7 +113,7 @@ for(yr_i in seq_along(csv_names)){
          train_df <- train_sub
          test_df <- test_sub
          pred_c_rf <- c(pred_c, "year", "zoneID") #"x_trun", "y_trun"
-         x_varname = names(data_all %>% dplyr::select(matches(pred_c_rf)))
+         x_varname = names(data_all %>% dplyr::select(pred_c_rf))
          print("RF predictors:")
          print(x_varname)
          ## LLO CV (small test for multiple years)
