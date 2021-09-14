@@ -36,11 +36,12 @@ cl <- parallel::makeCluster(cluster_no)
 doParallel::registerDoParallel(cl)
 foreach(yr_i = seq_along(csv_names))%dopar%{
    source("../EXPANSE_algorithm/scr/fun_call_lib.R")
+   library(data.table)
    csv_name <- csv_names[yr_i]
    valid_str <- unlist(strsplit(csv_name, '_'))[1]
    target_poll <- unlist(strsplit(csv_name, '_'))[2]
    
-   if((valid_str=='escape'&2010%in%years[[yr_i]])|(valid_str=='random')){
+   if(((valid_str=='escape'&2010%in%years[[yr_i]])|(valid_str=='random'))&(!file.exists(paste0('data/workingData/RF_result_validation_', csv_name, '.csv')))){ # &(!file.exists(paste0('data/workingData/RF_result_validation_', csv_name, '.csv')))
       df_all <- read_data(target_poll,  years[[yr_i]])
       valid_all <- read_validation(target_poll, valid_str)
       target_df <- df_all
@@ -60,7 +61,7 @@ foreach(yr_i = seq_along(csv_names))%dopar%{
          # valid_df <- data_all[index$valid, ]
          # test_df <- data_all[index$test, ]
          train_df <- target_df
-         pred_c_rf <- c(pred_c) #"x_trun", "y_trun"  ,  "cntr_code"
+         pred_c_rf <- c(pred_c, 'year') #"x_trun", "y_trun"  ,  "cntr_code"
          x_varname = names(train_df %>% dplyr::select(pred_c_rf))
          print("RF predictors:")
          print(x_varname)
