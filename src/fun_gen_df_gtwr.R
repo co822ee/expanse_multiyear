@@ -9,7 +9,7 @@ gen_df_gtwr <- function(gtwr_model, sp_p, df_p){
    coef_stack <- gtwr_model$SDF
    gridded(coef_stack) <- T
    coef_stack <- stack(coef_stack)
-   # Remove time_stamp (so that it would be easier to do modelling in gee)
+   # Remove time_stamp 
    coef_stack <- dropLayer(coef_stack, nlayers(coef_stack))
    # extract coefficient values for each point
    coef_df <- lapply(seq_along(sp_p), function(loc_i) raster::extract(coef_stack, sp_p[loc_i,]))
