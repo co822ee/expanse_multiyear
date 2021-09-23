@@ -4,19 +4,52 @@ library(gtools)
 library(reshape2)
 library(ggplot2)
 library(GGally)
-target_poll <- 'NO2'
-escape_obs <- 'no2'
+library(sf)
+target_poll <- 'PM25'
+escape_obs <- 'pm25'
 elapseR2 <- 0.494          ## 0.494 for NO2 and 0.648 for pm25
 elapseRMSE <- 11.47          ### 11.47 for no2 3.41 for pm25
-files <- paste0('data/processed/gee/predictionsAll_escape_', target_poll,'.csv')
-no2 <- read.csv(files, header=T)
-exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo')
-no2 <- no2[,!(names(no2)%in%exc_names)]
-no2_clean <- no2[,grepl('slr|rf|gwr', names(no2))]
+# files <- paste0('data/processed/gee/predictionsAll_escape', target_poll,'.csv')
+files <- list.files('data/processed/gee/', 'predictionsAll_escape')
+files <- files[grepl(target_poll, files)]
+no2_l <- lapply(paste0('data/processed/gee/', files[!grepl('RF', files)]), 
+              read.csv)  #
+no2_linear <- no2_l[[1]]
+no2_rf_pure_l <- lapply(paste0('data/processed/gee/', files[grepl('RF', files)]), 
+                 read.csv)  #add a index
+
+# There is one missing value in RF_2019...
+
+if(any(unlist(lapply(no2_rf_pure_l, nrow))!=max(unlist(lapply(no2_rf_pure_l, nrow))))){
+   no2_rf_pure <- Reduce(
+      function(x, y, ...) inner_join(x, y,  by=c('system.index'), ...), 
+      no2_rf_pure_l[unlist(lapply(no2_rf_pure_l, nrow))==max(unlist(lapply(no2_rf_pure_l, nrow)))] %>% 
+         lapply(., function(df_all) df_all %>% select(system.index, matches('rf_')))
+   )
+   
+   no2 <- inner_join(no2_rf_pure, no2_rf_pure_l[unlist(lapply(no2_rf_pure_l, nrow))!=max(unlist(lapply(no2_rf_pure_l, nrow)))] %>%
+                        lapply(., function(df_all) df_all %>% select(system.index, matches('rf_'))) %>% 
+                        Reduce(
+                           function(x, y, ...) inner_join(x, y,  by='system.index', ...), 
+                           .
+                        )
+                     ,
+                     by='system.index')
+   no2 <- inner_join(no2_linear, no2, by=names(no2_linear)[names(no2_linear)%in%names(no2)])
+}else{
+   no2 <- Reduce(
+      function(x, y, ...) inner_join(x, y,  by=c('system.index'), ...), 
+      no2_rf_pure_l[unlist(lapply(no2_rf_pure_l, nrow))==max(unlist(lapply(no2_rf_pure_l, nrow)))] %>% 
+         lapply(., function(df_all) df_all %>% select(system.index,  matches('rf_')))
+   )
+   no2 <- inner_join(no2_linear, no2, by=names(no2_linear)[names(no2_linear)%in%names(no2)])
+}
+
+no2_clean <- no2[, grepl('slr|gwr|rf', names(no2))]
 no2_clean <- no2_clean[, !grepl('no2lurfull', names(no2_clean))]
-names(no2_clean)
-# yrs_name <- substr(names(no2_clean), nchar(names(no2_clean))-3, nchar(names(no2_clean))) %>% as.numeric()
-# no2_clean <- no2_clean[, order(yrs_name)]
+model_years <- lapply(strsplit(names(no2_clean), "_"), `[[`, 3) %>% unlist
+# Select predictions for the year 2010
+no2_clean <- no2_clean[, model_years=='2010']
 models_name <- lapply(strsplit(names(no2_clean), "_"), `[[`, 1) %>% unlist
    # substr(names(no2_clean), nchar(names(no2_clean))-9, nchar(names(no2_clean))-5) 
 
@@ -27,65 +60,54 @@ scenarios_name <- lapply(strsplit(names(no2_clean), "_"), `[[`, 2) %>% unlist
 
 names(no2_clean)
 
-plotM <- function(data_df, colorZone=F, lim_range, gtitle){
-   names(data_df) <- c(names(data_df)[1], substr(names(data_df)[-1], 1, nchar(names(data_df)[-1])-5))
-   # data_df <- dcast(data_df,
-   #                    # as.formula(paste0('station_european_code+zone.name~', time_var)), 
-   #                    value.var = 'conc')
-   
-   upper.panel <- function(x, y){
-      points(x, y,xlim=c(-2,220), ylim=c(-2,220))
-      abline(0,1, col='red')
-   }
-   lowerFn <- function(data, mapping, ...) {
-      p <- ggplot(data = data, mapping = mapping) +
-         geom_point(colour = "black") +
-         geom_abline(intercept=0, slope=1, col='red')+
-         lims(x=lim_range,y=lim_range)
-      p
-   }
-   if(colorZone){
-      ggpairs(data=data_df, lower = list(continuous = wrap(lowerFn)),
-              upper = list(continuous = wrap("cor", size=6)),
-              diag=list(discrete="barDiag", 
-                        continuous = wrap("densityDiag", alpha=0.5)),
-              mapping=ggplot2::aes(colour=zone.name), title=gtitle,
-      )
-   }else{
-      ggpairs(data=data_df, lower = list(continuous = wrap(lowerFn)),
-              upper = list(continuous = wrap("cor", size=6)),
-              diag=list(discrete="barDiag", 
-                        continuous = wrap("densityDiag", alpha=0.5)), 
-              title=gtitle,
-      )
-   }
-   
-}
-# png(paste0("graph/randomPoints", target_poll, '.png'),
-#      height=12, width=15, units='in', res=300)
-# plotM(no2_clean, F, range_limit)
-# dev.off()
+
 if(target_poll=='NO2'){
    range_limit <- c(0, 140)
 }else{
    range_limit <- c(0, 45)
 }
-### Scatterplots between the 
-# plotM(no2[, c(escape_obs, names(no2_clean))], F, range_limit, '2010')+
-#    theme(strip.placement = "outside", text = element_text(size = 13))
+## Divide by country
+if(target_poll=='NO2'){
+   raw_df <- read.csv('data/raw/NO2_ESCAPE_2010_Feb2018_updated_for_SGR_without_SPB.csv')
+}else{
+   raw_df <- read.csv('data/raw/PM25_ESCAPE_2010_Feb2018_excluding_SGR.csv')
+}
+no2 <- inner_join(no2, raw_df %>% select(allid, x_etrs, y_etrs), by='allid')
+eu_bnd <- st_read("../expanse_shp/eu_expanse2.shp")
+no2_p <- st_as_sf(no2, coords = c('x_etrs', 'y_etrs'), crs=st_crs(eu_bnd))
+join_t <- st_join(eu_bnd, no2_p)
+join_t <- join_t[!is.na(join_t$allid),]
+no2 <- as.data.frame(join_t)
+em_df <- lapply(names(no2_clean), function(pred_name){
+   scenario_name <- substr(pred_name, 1, nchar(pred_name)-5)
+   model_name <- unlist(strsplit(pred_name, '_'))[1]
+   no2_df <- lapply(unique(no2$CNTR_ID), function(cntrid){
+      no2_df <- no2 %>% filter(CNTR_ID==cntrid)
+      error_matrix(no2_df[, escape_obs], no2_df[, pred_name]) %>% 
+         t() %>% 
+         as.data.frame() %>% 
+         mutate(model=model_name, scenario=scenario_name, CNTR_ID=cntrid, 
+                NAME_ENGL=unique(no2_df$NAME_ENGL))
+      
+   }) %>% do.call(rbind,. )
+   no2_df
+}) %>% do.call(rbind, . )
+ggplot(em_df, aes(x=CNTR_ID, y=explained_var, fill=scenario))+  #fill=model
+   geom_bar(stat="identity", position = "dodge2")+
+   facet_grid(scenario~.)
+ggplot(em_df, aes(x=NAME_ENGL, y=explained_var, fill=scenario))+  #fill=model
+   geom_bar(stat="identity", position = "dodge2")+
+   labs(title=target_poll)+
+   coord_flip()
+   
 
-# png(paste0("results/figures/escapePoints", target_poll, '.png'),
-#     height=12, width=15, units='in', res=300)
-# plotM(no2[, c(escape_obs, names(no2_clean))], F, range_limit, '2010')+
-#    theme(strip.placement = "outside", text = element_text(size = 13))
-# dev.off()
+lapply(unique(em_df$scenario), function(model_a){
+   em_df %>% filter(scenario==model_a) %>% select(scenario, explained_var, NAME_ENGL)
+})
 
+table(no2$X.code)
 ### 
 library(APMtools)
-# Remove na in no2 (escape )
-no2[is.na(no2$rf_00.19_2010), ] %>% View ## Dont know why there is one station with NA values for RF
-no2 <- no2[!is.na(no2$rf_00.19_2010), ]
-
 em_df <- lapply(names(no2_clean), function(pred_name){
    scenario_name <- substr(pred_name, 1, nchar(pred_name)-5)
    model_name <- unlist(strsplit(pred_name, '_'))[1]
@@ -99,7 +121,7 @@ if(target_poll=='NO2'){
           aes(x=scenario, y=values, fill=model))+  #fill=model
       geom_bar(stat="identity", position = "dodge2")+
       # facet_grid(EM~., scales ='free')+
-      labs(y='R2')+
+      labs(y='R2', title = target_poll)+
       coord_flip()+
       theme(axis.title = element_text(size = 13),
             axis.text = element_text(size = 11),
@@ -113,7 +135,7 @@ if(target_poll=='NO2'){
           aes(x=scenario, y=values, fill=model))+  #fill=model
       geom_bar(stat="identity", position = "dodge2")+
       # facet_grid(EM~., scales ='free')+
-      labs(y='R2')+
+      labs(y='R2', title = target_poll)+
       coord_flip()+
       theme(axis.title = element_text(size = 13),
             axis.text = element_text(size = 11),
@@ -123,14 +145,14 @@ if(target_poll=='NO2'){
       geom_hline(aes(yintercept=elapseR2))
 }
 ggsave(paste0('results/figures/escape_r2_', target_poll,'.tiff'), 
-       width = 7, height = 7, units = 'in', dpi = 600)
+       width = 8, height = 6, units = 'in', dpi = 300)
 if(target_poll=='NO2'){
    
    ggplot(em_df %>% select(RMSE, model, scenario) %>%  gather("perfm", "values", -c("model", 'scenario')), 
           aes(x=scenario, y=values, fill=model))+  #fill=model
       geom_bar(stat="identity", position = "dodge2")+
       # facet_grid(EM~., scales ='free')+
-      labs(y='RMSE')+
+      labs(y='RMSE', title = target_poll)+
       coord_flip()+
       theme(axis.title = element_text(size = 13),
             axis.text = element_text(size = 11),
@@ -145,7 +167,7 @@ if(target_poll=='NO2'){
           aes(x=scenario, y=values, fill=model))+  #fill=model
       geom_bar(stat="identity", position = "dodge2")+
       # facet_grid(EM~., scales ='free')+
-      labs(y='RMSE')+
+      labs(y='RMSE', title = target_poll)+
       coord_flip()+
       theme(axis.title = element_text(size = 13),
             axis.text = element_text(size = 11),
@@ -155,7 +177,7 @@ if(target_poll=='NO2'){
       geom_hline(aes(yintercept=elapseRMSE))
 }
 ggsave(paste0('results/figures/escape_RMSE_', target_poll,'.tiff'), 
-       width = 7, height = 7, units = 'in', dpi = 600)
+       width = 8, height = 6, units = 'in', dpi = 300)
 
 ### Give NO2 performance matrix for stations with PM25 as well
 
