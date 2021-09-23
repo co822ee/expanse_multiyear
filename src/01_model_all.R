@@ -3,7 +3,7 @@
 
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 # Whether to tune RF
-target_poll = 'PM2.5'
+target_poll = 'O3'
 tuneRF_b = T
 local_crs <- CRS("+init=EPSG:3035")
 seed <- 123
@@ -12,24 +12,16 @@ csv_names <- paste0('all_',target_poll, "_",c('08-10', '09-11', '10-12',
                                              '08-12', '06-12', '12-19', '00-19'))   #2008:2012
 years <- list(2008:2010, 2009:2011, 2010:2012, 
               2008:2012, 2006:2012, 2012:2019, 2000:2019)
-if(target_poll=='PM2.5'){
-   df_all <- read.csv('../EXPANSE_predictor/data/raw/gee/pred_pm25All.csv')
-}else if(target_poll=='NO2'){
-   df_all <- read.csv('../EXPANSE_predictor/data/raw/gee/pred_no2All.csv') %>% 
-      filter(obs<=500)
-}
-df_all$zoneID <- as.factor(df_all$zoneID)
+source("../expanse_multiyear/src/00_fun_read_data_gee.R")
+source('../EXPANSE_algorithm/scr/fun_select_predictor.R')
+
 # Check whether the predictors are processed or not
 run_i <- 1
 for(yr_i in seq_along(csv_names)){
-   target_df <- df_all %>% filter(year%in%years[[yr_i]])
-   if(length(years[[yr_i]])==1){
-      exc_names <- c('system.index', 'obs', 'sta_code', 'component_caption', '.geo', 'year')
-   }else{
-      exc_names <- c('system.index', 'obs', 'sta_code', 'component_caption', '.geo')
-   }
-   pred_c <- names(df_all)[!(names(df_all)%in%exc_names)]
-   pred_c <- pred_c[!pred_c%in%c('year', 'zoneID')]  ## exclude year first and then add it at the final stage for slr 
+   df_all <- read_data(target_poll,  years[[yr_i]])
+   target_df <- df_all
+   pred_c <- select_predictor(df_all)
+   
    # Don't need to do this because the sign of the predictor values is changed in GEE already
    # if(target_poll=='PM2.5'){
    #    neg_pred <- pred_c[grepl("clc14|clc7|precip", pred_c)]
@@ -42,19 +34,16 @@ for(yr_i in seq_along(csv_names)){
       print("********************************************")
       print(csv_name)
       print(target_poll)
-      sta <- read.csv("../EXPANSE_APM/data/processed/all_sta.csv")
-      target_df <- inner_join(target_df, sta %>% dplyr::select(-'cntr_code'), by='sta_code')
-      target_df$year <- as.factor(target_df$year)
       source("../EXPANSE_algorithm/scr/fun_slr_for.R")
       # check the predictor variables
       print("SLR predictors:")
       # source("../EXPANSE_algorithm/scr/fun_slr_proc_in_data.R")
       # target_df2 <- proc_in_data(target_df, neg_pred, "xcoord", "ycoord")
-      target_df %>% dplyr::select(matches(c( pred_c))) %>% names()
+      target_df %>% dplyr::select(pred_c) %>% names()
       if(target_poll=='NO2'&any(years[[yr_i]]%in%2019)){
          target_df = target_df[-which.max(target_df$obs), ]
       }
-      slr_result <- slr(target_df$obs, as.data.frame(target_df[, c( c(pred_c))]),
+      slr_result <- slr(target_df$obs, as.data.frame(target_df[, pred_c[pred_c!='year']]),
                         cv_n = csv_name,
                         R2thres = ifelse(target_poll=='PM2.5', 0.0, 0.01))
       slr_model <- slr_result[[3]]
@@ -81,8 +70,8 @@ for(yr_i in seq_along(csv_names)){
       # valid_df <- data_all[index$valid, ]
       # test_df <- data_all[index$test, ]
       train_df <- target_df
-      pred_c_rf <- c(pred_c) #"x_trun", "y_trun"  ,  "cntr_code"
-      x_varname = names(train_df %>% dplyr::select(matches(pred_c_rf)))
+      pred_c_rf <- c(pred_c, "year", "zoneID") #"x_trun", "y_trun"
+      x_varname = names(train_df %>% dplyr::select(pred_c_rf))
       print("RF predictors:")
       print(x_varname)
       ## LLO CV (small test for multiple years)
@@ -120,18 +109,18 @@ for(yr_i in seq_along(csv_names)){
       
       ### Output parameter outcome
       hyper_grid <- read.csv(paste0("data/workingData/rf_hyper_grid_", csv_name,".csv"))
-      hyper_grid2 <- hyper_grid[hyper_grid$ntree==min(hyper_grid$ntree),]
+      # hyper_grid2 <- hyper_grid[hyper_grid$ntree==min(hyper_grid$ntree),]
       slr_summary <- read.csv(paste0("data/workingData/SLR_summary_model_year_", csv_name, ".csv") )[, c('variables', 'beta')]
       slr_summary$poll <- target_poll
-      hyper_grid2$yr_str <- strsplit(csv_name, '_') %>% lapply(., `[[`, 3) %>% unlist
+      hyper_grid$yr_str <- strsplit(csv_name, '_') %>% lapply(., `[[`, 3) %>% unlist
       slr_summary$csv_name = csv_name
       if(run_i==1){
          # gwrCoefAll <- coef_stack
-         hyperAll <- hyper_grid2[which.min(hyper_grid2$OOB_RMSE),] %>% mutate( csv_name=csv_name)
+         hyperAll <- hyper_grid[which.min(hyper_grid$OOB_RMSE),] %>% mutate( csv_name=csv_name)
          slrCoefAll <- slr_summary
       }else{
          # gwrCoefAll <- stack(gwrCoefAll, coef_stack)
-         hyperAll <- rbind(hyperAll, hyper_grid2[which.min(hyper_grid2$OOB_RMSE),] %>% mutate(csv_name=csv_name))
+         hyperAll <- rbind(hyperAll, hyper_grid[which.min(hyper_grid$OOB_RMSE),] %>% mutate(csv_name=csv_name))
          slrCoefAll <- rbind(slrCoefAll, slr_summary)
       }
       run_i <- run_i+1
@@ -140,8 +129,8 @@ for(yr_i in seq_along(csv_names)){
 
 write.csv(hyperAll, paste0('data/processed/RFhyper_', 'all_', target_poll, "multipleyear.csv"), 
           row.names = F)
-write.csv(slrCoefAll, paste0('data/processed/SLRcoef_', 'all_', target_poll, "multipleyear.csv"), 
-          row.names = F)   ## with year
+# write.csv(slrCoefAll, paste0('data/processed/SLRcoef_', 'all_', target_poll, "multipleyear.csv"), 
+#           row.names = F)   ## with year
 
 ## combine air pollutants and create new variables in the table
 rfFiles <- list.files('data/processed/', 'RFhyper_all_')
