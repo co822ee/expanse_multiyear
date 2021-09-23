@@ -51,7 +51,12 @@ trainGTWR <- function(sp_train1, gtwr_yr, sp_valid1, valid_sub1, target_poll, eq
             gtwr_valid <- gen_df_gtwr(gtwr_model, sp_valid_sub, valid_sub1)
             return(gtwr_valid)
          }else{
-            return(cbind(data.frame(gtwr=NA), valid_sub1))
+            if(nrow(valid_sub1)==0){
+               
+               return(cbind(data.frame(gtwr=NA), valid_sub1[1,]))
+            }else{
+               return(cbind(data.frame(gtwr=NA), valid_sub1))
+            }
          }
       }else{
          return(cbind(data.frame(gtwr=NA), valid_sub1))
