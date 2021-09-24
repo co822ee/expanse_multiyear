@@ -58,7 +58,8 @@ for(yr_i in seq_along(csv_names)){
                           sp_valid1=sp_test, valid_sub1=test_sub, 
                           target_poll=target_poll, eq=eq,
                           grd=grd2, lamda=0.1, ksi=0) %>% do.call(rbind, .)
-      
+      ## Remove NA predictions (00-19 PM2.5 for year 2000)
+      pred_test <- pred_test[!is.na(pred_test$gtwr), ]
       # output the predictions for the test data for each fold
       write.csv(pred_test, paste0('data/workingData/gtwr_pred_', csv_name, 
                                   '_fold_', fold_i, '.csv'))

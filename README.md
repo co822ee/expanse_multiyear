@@ -1,3 +1,5 @@
+*The modelling work is still at an evaluation stage.*
+
 # expanse_multiyear
 
 Version 0.1.0
@@ -31,6 +33,13 @@ This is a place to explore spatio-temporal modelling for multiple years at an an
 
 ```
 
+## Code
+
+In the folder src, you can find R code for implementing the multi-year modelling for annual average exposures for the entire Europe. 
+
+00_ model_structure_clean.R gives the modelling process for supervised linear regression and random forests.
+00_gtwr.R implements the geographically and temporally weighted regression.
+These two R scripts implements 5-fold cross-validation 
 
 ## License
 
