@@ -1,3 +1,4 @@
+# This script tunes the parameters for GTWR (lamda, ksi, and the equivalent temporal distance)
 #------ 1) Read in data ------
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 library(doParallel)

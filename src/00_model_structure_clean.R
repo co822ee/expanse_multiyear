@@ -14,8 +14,8 @@ source("src/00_fun_read_data_gee.R")
 # Whether to tune RF
 tuneRF = T
 # Multiple single years
-target_poll <- c('PM2.5', 'PM10', 'NO2', 'O3')
-csv_names <- lapply(target_poll, function(poll_name){
+target_poll_v <- c('PM2.5', 'PM10', 'NO2', 'O3')
+csv_names <- lapply(target_poll_v, function(poll_name){
    paste0('o3_', poll_name, "_",c('08-10', '09-11', '10-12', 
                                   '08-12', '06-12', '12-19', '00-19'))
 }) %>% unlist   #2008:2012
@@ -28,17 +28,11 @@ for(yr_i in seq_along(csv_names)){
    csv_name <- csv_names[yr_i]
    print("********************************************")
    print(csv_name)
-   
+   target_poll <- unlist(strsplit(csv_name, '_'))[2]
    df_sub <- read_data(target_poll,  years[[yr_i]])
-   if(length(years[[yr_i]])==1){
-      exc_names <- c('system.index', 'obs', 'sta_code', 'component_caption', '.geo', 'year', 
-                     'cntr_code', 'xcoord', 'ycoord', 'sta_type')
-   }else{
-      exc_names <- c('system.index', 'obs', 'sta_code', 'component_caption', '.geo',
-                     'cntr_code', 'xcoord', 'ycoord', 'sta_type')
-   }
-   pred_c <- names(df_sub)[!(names(df_sub)%in%exc_names)]
-   pred_c <- pred_c[!pred_c%in%c('year')]  ## exclude year first and then add it at the final stage for slr 
+   source('../EXPANSE_algorithm/scr/fun_select_predictor.R')
+   pred_c <- select_predictor(df_sub)
+   
    print(paste0("year: ", unique(df_sub$year)))
    if(nrow(df_sub)>200){
       source("src/00_fun_create_fold.R")
@@ -62,8 +56,8 @@ for(yr_i in seq_along(csv_names)){
          source("../EXPANSE_algorithm/scr/fun_slr_for.R")
          # check the predictor variables
          print("SLR predictors:")
-         x_var <- train_sub %>% dplyr::select(matches(pred_c)) %>% names()
-         slr_result <- slr(train_sub$obs, train_sub %>% dplyr::select(x_var) %>% as.data.frame(),
+
+         slr_result <- slr(train_sub$obs, as.data.frame(train_sub[, pred_c[pred_c!='year']]),
                            cv_n = csv_name_fold, R2thres = ifelse(target_poll=='PM2.5', 0.0, 0.01))
          slr_model <- slr_result[[3]]
          ### new: Add year for multiple year modelling
@@ -75,31 +69,31 @@ for(yr_i in seq_along(csv_names)){
          slr_output[1,1] <- 'Final'
          colnames(slr_output) <- c("variables", "beta", "Std.Error", "t", "P")
          write.csv(slr_output, paste0('data/workingData/SLR_summary_model_year_', csv_name_fold, '.csv'), row.names=F)
-         
+
          source("../EXPANSE_algorithm/scr/fun_gen_pred_df.R")
          output_slr_result <- function(model, test_df, train_df, output_filename, obs_varname,
-                                       outputselect = c("station_european_code", "slr", "obs", "res", 
+                                       outputselect = c("station_european_code", "slr", "obs", "res",
                                                         "nfold", "df_type", "year", "index")){
             slr_poll_test <- gen_pred_df(model, test_df, obs_varname)
             slr_poll_train <- gen_pred_df(model, train_df, obs_varname)
             eval_test <- error_matrix(slr_poll_test[, obs_varname], slr_poll_test$slr)
             eval_train <- error_matrix(slr_poll_train[, obs_varname], slr_poll_train$slr)
-            
+
             slr_poll <- rbind(slr_poll_train %>% mutate(df_type = 'train'),
                               slr_poll_test %>% mutate(df_type = 'test'))
             slr_poll <- slr_poll[, outputselect]
-            write.csv(slr_poll, 
-                      paste0('data/workingData/SLR_result_all_', output_filename, '.csv'), 
+            write.csv(slr_poll,
+                      paste0('data/workingData/SLR_result_all_', output_filename, '.csv'),
                       row.names = F)
             return(list(slr_poll, eval_train=eval_train, eval_test=eval_test))
          }
-         
+
          slr_poll <- output_slr_result(slr_model, test_df = test_sub, train_df = train_sub,
                                        output_filename = csv_name_fold, obs_varname = 'obs',
                                        outputselect = c("sta_code", "slr", "obs", "res",
                                                         "nfold", "df_type", "year", "index"))
          slr_df <- slr_poll[[1]]
-         
+
          slr_poll$eval_train %>% print()
          slr_poll$eval_test %>% print()
          
