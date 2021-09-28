@@ -13,3 +13,5 @@
 *.csv.zip
 .Rproj.user
 *.html
+*.DS_Store
+*.tif.aux.xml
