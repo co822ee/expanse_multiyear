@@ -97,7 +97,7 @@ set.seed(seed)
 train_df <- train_sub
 test_df <- test_sub
 pred_c_rf <- c(pred_c, "year", "zoneID") #"x_trun", "y_trun"  ,  "cntr_code"
-x_varname = names(data_all %>% dplyr::select(matches(pred_c_rf)))
+x_varname = names(data_all %>% dplyr::select(pred_c_rf))
 print("RF predictors:")
 print(x_varname)
 ## LLO CV (small test for multiple years)

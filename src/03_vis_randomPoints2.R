@@ -105,6 +105,8 @@ yr=2018
 no2_clean_p <- no2_clean[, grepl(yr, names(no2_clean))]
 # gather(no2_clean_p, 'model', 'values', )
 
+# data_df <- no2_clean[, grepl('2018', names(no2_clean))]
+
 plotM <- function(data_df, colorZone=F, lim_range, gtitle){
    names(data_df) <- substr(names(data_df), 1, nchar(names(data_df))-4)
    # data_df <- dcast(data_df,
@@ -127,14 +129,14 @@ plotM <- function(data_df, colorZone=F, lim_range, gtitle){
               upper = list(continuous = wrap("cor", size=8)),
               diag=list(discrete="barDiag", 
                         continuous = wrap("densityDiag", alpha=0.5)),
-              mapping=ggplot2::aes(colour=zone.name), title=gtitle,
+              mapping=ggplot2::aes(colour=zone.name), title=gtitle
       )
    }else{
       ggpairs(data=data_df, lower = list(continuous = wrap(lowerFn)),
               upper = list(continuous = wrap("cor", size=8)),
               diag=list(discrete="barDiag", 
                         continuous = wrap("densityDiag", alpha=0.5)), 
-              title=gtitle,
+              title=gtitle
       )
    }
    
@@ -153,6 +155,9 @@ if(target_poll=='NO2'){
 
 plotM(no2_clean[, grepl('2018', names(no2_clean))], F, range_limit, '2018')+
    theme(strip.placement = "outside", text = element_text(size = 13))
+
+plotM(no2_clean[, grepl('rf', names(no2_clean))], F, range_limit, 'rf')
+
 plotM(no2_clean[, grepl('2012', names(no2_clean))], F, range_limit, '2012')
 plotM(no2_clean[, grepl('2009', names(no2_clean))], F, range_limit, '2009')
 plotM(no2_clean[, grepl('2000', names(no2_clean))], F, range_limit, '2000')
