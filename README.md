@@ -4,7 +4,7 @@
 
 Version 0.1.0
 
-This is a place to explore spatio-temporal modelling for multiple years at an annual and subannual scale
+This is a place to explore spatio-temporal modelling for multiple years at an annual scale
 
 
 ## Project organization

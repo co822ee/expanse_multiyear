@@ -5,3 +5,11 @@
 /data/temp
 /data/processed
 /data/raw
+/graph
+*.png
+*.tif
+*.tiff
+*.csv
+*.csv.zip
+.Rproj.user
+*.html
