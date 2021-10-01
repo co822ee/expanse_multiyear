@@ -37,9 +37,25 @@ This is a place to explore spatio-temporal modelling for multiple years at an an
 
 In the folder src, you can find R code for implementing the multi-year modelling for annual average exposures for the entire Europe. 
 
-00_ model_structure_clean.R gives the modelling process for supervised linear regression and random forests.
-00_gtwr.R implements the geographically and temporally weighted regression.
+#### SLR, RF
+``00_ model_structure_clean.R`` gives the modelling process for supervised linear regression and random forests.
+
+#### GTWR
+``00_gtwr.R`` implements the geographically and temporally weighted regression.
 These two R scripts implements 5-fold cross-validation 
+
+
+``00_optimize_gtwr.R`` tunes the parameters for GTWR (lamda, ksi, and the equivalent temporal distance).
+
+
+### Output random forests predictions at random points
+``01_combineRandomPointsPredictors.R``
+``02_rf_randomAndEscape.R``
+#### Then visualize the results (combined with the predictions obtained from GEE for SLR, GWR, GTWR)
+``03_vis_escape2.R``
+``03_vis_randomPoints2.R``
+
+
 
 ## License
 
