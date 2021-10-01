@@ -1,4 +1,5 @@
 # This script tunes the parameters for GTWR (lamda, ksi, and the equivalent temporal distance)
+# Stop at 06-12
 #------ 1) Read in data ------
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 library(doParallel)
@@ -42,20 +43,8 @@ for(yr_i in seq_along(csv_names)){
       source('src/fun_create_regressionGrid.R')
       source('src/fun_gen_df_gtwr.R')
       source('src/fun_run_GTWR.R')
+      source('src/fun_calibr_GTWR.R')
       
-      
-      calibr_GTWR <- function(paramGrid_i, nfold, yrs_v, grd, train_df, param){
-         print(paste0('paramGrid_i: ', paramGrid_i))
-         gtwr_valid <- lapply(1:nfold, run_GTWR, grid_i=paramGrid_i, yrs_v, grd=grd,
-                              train_df=train_df, param=param) %>% do.call(rbind, .) ## should be the same size as data_all2
-         gtwr_valid2 <- gtwr_valid[!is.na(gtwr_valid$gtwr), ]
-         #------ 8) Evaluate the performance for GTWR model ------
-         # Remove NA values for gtwr
-         cbind(t(error_matrix(gtwr_valid2$obs, gtwr_valid2$gtwr)), 
-               param[paramGrid_i, ],
-               data.frame(ndata=round(nrow(gtwr_valid2)/nrow(gtwr_valid)*100, 1)))  
-         ## Need ndata to inspect whether there is enough amount of fold used for CV!
-      }
       #------------------------------------------------------------
       test_sub <- data_all[data_all$nfold==fold_i,]
       train_sub <- data_all[-test_sub$index, ] #data_all$index starts from 1 to the length.
@@ -73,8 +62,9 @@ for(yr_i in seq_along(csv_names)){
       # Create a grid of parameters (lamda & ksi)  using expand.grid
       gtwr_param <- expand.grid(lamda=seq(0.2, 1, 0.4), 
                                 ksi=seq(0, pi/2, pi/4), 
-                                conv_dist=c(0.3, 0.6, 1, 5, seq(10, 50, 10))*1000)
+                                conv_dist=c(0.3, 0.6, 1, 5, seq(10, 50, 10))*1000)  # unit of conv_dist: meter/time-unit (here the time-unit=year)
       
+      # Output the 5-CV performance of each combination of the GTWR parameters (ksi, lamda, conv_dist)
       final_perfm <- lapply(1:(nrow(gtwr_param)), calibr_GTWR, nfold=nfold, 
                             yrs_v=years[[yr_i]], grd=grd2, train_df=train_sub, param=gtwr_param)
       final_perfm2 <- final_perfm %>% do.call(rbind, .)
@@ -88,6 +78,7 @@ for(yr_i in seq_along(csv_names)){
    stopCluster(cl)
 }
 ## Does it necessary to calibrate the parameters?
+## [Result 1: only calibrating ksi and lamda without setting conv_dist (default conv_dist=1)]
 ## It seems that ksi=0 and lamda=0.1 would give the best result
 ## although the difference between different parameter values is rather small.
 
