@@ -5,7 +5,7 @@
 # nfold=5
 # This needs to be reset to the original CreateSpacetimeFolds function
 # Cause the data from the same station from different years is included in both training data test data.
-create_fold <- function(data_df, seed, strt_group, multiyear_group = c("sta_code", "year"),
+create_fold <- function(data_df, seed=123, strt_group, multiyear_group = c("sta_code", "year"),
                          nfold=5, m_var='m'){
    # data_df: the dataset you want to split for training and testing
    # seed: 123
