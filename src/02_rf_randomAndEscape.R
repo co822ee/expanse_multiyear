@@ -71,10 +71,12 @@ foreach(yr_i = seq_along(csv_names))%dopar%{
          
          source("../EXPANSE_algorithm/scr/fun_output_rf_pred.R")
          # If tuneRF is False, a 500 number of trees and sqrt(x_varname no) of mtry woul be used
-         output_rf_pred(train_df, valid_all,
+         rf_result <- output_rf_pred(train_df, valid_all,
                         y_varname='obs',
-                        x_varname = x_varname,
-                        csv_name, hyper_grid, tuneRF_b)
+                        x_varname = x_varname, hyper_grid, tuneRF_b)
+         write.csv(rf_result, 
+                   paste0('data/workingData/RF_result_validation_', csv_name, '.csv'), 
+                   row.names = F)
       }
    }
 }
