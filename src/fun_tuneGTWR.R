@@ -8,7 +8,7 @@ tuneGTWR <- function(sp_train1, gtwr_yr, grid_i, sp_valid1, valid_sub1, target_p
    #'@param target_poll the air pollutant
    #'@param eq the equation
    #'@param grd the spatial regression grid cell of the GTWR
-   #'@param param the GTWR parameter grid (with all combinations of GTWR parameters)
+   #'@param param the GTWR parameter grid (with all combinations of GTWR parameters: ksi, lamda & conv_dist)
    #'@return data frame object with gtwr as the GTWR predictions
   
    sp_valid_sub <- sp_valid1[sp_valid1$year==gtwr_yr,]
