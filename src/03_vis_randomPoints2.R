@@ -6,6 +6,7 @@ library(ggplot2)
 library(GGally)
 library(sf)
 library(data.table)
+library(tmap)
 target_polls <- c('NO2', 'PM25', 'PM10')
 target_polls2 <- c('NO2', 'PM2.5', 'PM10')
 escape_obss <- c('no2', 'pm25', 'pm10')
@@ -84,6 +85,7 @@ no2 <- inner_join(no2_linear, no2_rf_pure, by=names(no2_linear)[names(no2_linear
 no2 <- inner_join(no2, no2_rf_pure3, by=names(no2)[names(no2)%in%names(no2_rf_pure3)])
 
 fwrite(no2, paste0('data/processed/prediction_random_fromR_', target_poll2), row.names=F)
+rm(list=c('no2_rf_pure_l', 'no2_rf_pure_l3', 'no2_l'))
 
 names(no2)
 exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
@@ -107,16 +109,20 @@ no2_clean_p <- no2_clean[, grepl(yr, names(no2_clean))]
 
 # data_df <- no2_clean[, grepl('2018', names(no2_clean))]
 
-plotM <- function(data_df, colorZone=F, lim_range, gtitle){
-   names(data_df) <- substr(names(data_df), 1, nchar(names(data_df))-4)
+plotM <- function(data_df, colorZone=F, lim_range, gtitle, sameYr=T){
+   if(sameYr){
+      names(data_df) <- substr(names(data_df), 1, nchar(names(data_df))-4)
+   }else{
+      names(data_df) <- unlist(lapply(strsplit(names(data_df), '_'), `[[`, 3))
+   }
    # data_df <- dcast(data_df,
    #                    # as.formula(paste0('station_european_code+zone.name~', time_var)), 
    #                    value.var = 'conc')
    
-   upper.panel <- function(x, y){
-      points(x, y,xlim=c(-2,220), ylim=c(-2,220))
-      abline(0,1, col='red')
-   }
+   # upper.panel <- function(x, y){
+   #    points(x, y,xlim=c(-2,220), ylim=c(-2,220))
+   #    abline(0,1, col='red')
+   # }
    lowerFn <- function(data, mapping, ...) {
       p <- ggplot(data = data, mapping = mapping) +
          geom_point(colour = "black") +
@@ -126,23 +132,22 @@ plotM <- function(data_df, colorZone=F, lim_range, gtitle){
    }
    if(colorZone){
       ggpairs(data=data_df, lower = list(continuous = wrap(lowerFn)),
-              upper = list(continuous = wrap("cor", size=8)),
+              upper = list(continuous = wrap("cor", size=5)),
               diag=list(discrete="barDiag", 
                         continuous = wrap("densityDiag", alpha=0.5)),
               mapping=ggplot2::aes(colour=zone.name), title=gtitle
       )
    }else{
       ggpairs(data=data_df, lower = list(continuous = wrap(lowerFn)),
-              upper = list(continuous = wrap("cor", size=8)),
+              upper = list(continuous = wrap("cor", size=5)),
               diag=list(discrete="barDiag", 
                         continuous = wrap("densityDiag", alpha=0.5)), 
               title=gtitle
       )
    }
-   
 }
 # png(paste0("graph/randomPoints", target_poll, '.png'),
-#      height=12, width=15, units='in', res=300)
+#      height=12, width=16.5, units='in', res=300)
 # plotM(no2_clean, F, range_limit, '2008')
 # dev.off()
 if(target_poll=='NO2'){
@@ -153,89 +158,125 @@ if(target_poll=='NO2'){
    range_limit <- c(0, 35)
 }
 
+# For the same year and different algorithms
 plotM(no2_clean[, grepl('2018', names(no2_clean))], F, range_limit, '2018')+
    theme(strip.placement = "outside", text = element_text(size = 13))
 
-plotM(no2_clean[, grepl('rf', names(no2_clean))], F, range_limit, 'rf')
 
 plotM(no2_clean[, grepl('2012', names(no2_clean))], F, range_limit, '2012')
 plotM(no2_clean[, grepl('2009', names(no2_clean))], F, range_limit, '2009')
 plotM(no2_clean[, grepl('2000', names(no2_clean))], F, range_limit, '2000')
 
-# png(paste0("graph/randomPoints", target_poll, '_slr.png'),
-#     height=12, width=15, units='in', res=300)
-# plotM(no2_clean[, grepl('slr', names(no2_clean))], F, range_limit)
-# dev.off()
+## Plot predictions for different years using the same algorithm
 
+# 1. single-year SLR
+png(paste0("graph/randomPoints", target_poll, '_slr.png'),
+    height=12, width=16.5, units='in', res=300)
+plotM(no2_clean[, grepl('slr_20', names(no2_clean))], F, range_limit, 'Single-year SLR', F)+
+   theme(strip.placement = "outside", text = element_text(size = 13))
+dev.off()
+
+# 2. single-year GWR
 png(paste0("graph/randomPoints", target_poll, '_gwr.png'),
-    height=12, width=15, units='in', res=100)
-plotM(no2_clean[, grepl('gwr', names(no2_clean))], F, range_limit, 'GWR')+
+    height=12, width=16.5, units='in', res=100)
+plotM(no2_clean[, grepl('gwr_20', names(no2_clean))], F, range_limit, 'Single-year GWR', F)+
    theme(strip.placement = "outside", text = element_text(size = 13))
 dev.off()
 
+# 3. single-year random forests
 png(paste0("graph/randomPoints", target_poll, '_rf.png'),
-    height=12, width=15, units='in', res=100)
-plotM(no2_clean[, grepl('rf', names(no2_clean))], F, range_limit, 'RF')+
+    height=12, width=16.5, units='in', res=100)
+plotM(no2_clean[, grepl('rf_20', names(no2_clean))], F, range_limit, 'Single-year RF', F)+
    theme(strip.placement = "outside", text = element_text(size = 13))
 dev.off()
+
+# 4. multiple-year SLR
+png(paste0("graph/randomPoints", target_poll, '_mslr.png'),
+    height=12, width=16.5, units='in', res=100)
+plotM(no2_clean[, grepl('slr_00.19', names(no2_clean))], F, range_limit, 'Multiple-year SLR', F)+
+   theme(strip.placement = "outside", text = element_text(size = 13))
+dev.off()
+
+# 5. multiple-year random forests
+png(paste0("graph/randomPoints", target_poll, '_mrf.png'),
+    height=12, width=16.5, units='in', res=100)
+plotM(no2_clean[, grepl('rf_00.19', names(no2_clean))], F, range_limit, 'Multiple-year RF', F)+
+   theme(strip.placement = "outside", text = element_text(size = 13))
+dev.off()
+
+
 
 
 ### Plot the scatterplots of predictions at random points
 ## from different algorithms.
-files <- list.files('data/processed/gee/', 'predictionsAll_random')
-files <- files[grepl(target_poll, files)]
-no2_l <- lapply(paste0('data/processed/gee/', files[!grepl('RF', files)]), 
-                read.csv)  #
-no2_linear <- do.call(rbind, no2_l)
-no2_rf_pure_l <- lapply(paste0('data/processed/gee/', files[grepl('RF', files)]), 
-                        read.csv)  #add a index
+# mrf_wide <- lapply(3:ncol(no2_clean), function(col_index){
+#    target_df <- no2_clean[, c(1,2, col_index)] 
+#    target_df$year <- as.numeric(strsplit(names(target_df)[3], '_')[[1]][3])
+#    names(target_df)[3] <- paste0(strsplit(names(target_df)[3], '_')[[1]][1],
+#                                  '_',
+#                                  strsplit(names(target_df)[3], '_')[[1]][2])
+#    
+#    target_df%>% pivot_longer(., cols =  names(target_df)[3], names_to = 'model', 
+#                              values_to = 'prediction')
+# })
+# all_algorithms <- do.call(rbind, mrf_wide)
+# rm(mrf_wide)
+# names(all_algorithms)
+# all_algorithms$model %>% unique
 
+strs_v <- data.frame(str1='slr_2010_2010',
+                     str2=c('slr_2019_2019', 
+                            'slr_2015_2015',
+                            'slr_2005_2005',
+                            'slr_2000_2000'))
+strs_v <- data.frame(str1='rf_2010_2010',
+                     str2=c('rf_2019_2019', 
+                            'rf_2015_2015',
+                            'rf_2005_2005',
+                            'rf_2000_2000'))
+strs_v <- data.frame(str1='gwr_2010_2010',
+                     str2=c('gwr_2019_2019', 
+                            'gwr_2015_2015',
+                            'gwr_2005_2005',
+                            'gwr_2000_2000'))
 
-# There is one missing value in RF_2019...
-if(any(unlist(lapply(no2_rf_pure_l, nrow))!=50887)){
-   no2_rf_pure <- Reduce(
-      function(x, y, ...) inner_join(x, y,  by=c('system.index', 'cntr_name', 'cntr_id'), ...), 
-      no2_rf_pure_l[unlist(lapply(no2_rf_pure_l, nrow))==50887] %>% 
-         lapply(., function(df_all) df_all %>% select(system.index, cntr_name, 
-                                                      cntr_id, matches('rf_')))
-   )
+lapply(1:nrow(strs_v), function(i){
+   str1 <- strs_v[i, 1]
+   str2 <- strs_v[i, 2]
+   cor_v <- lapply(unique(no2_clean$cntr_id), function(target_cntr){
+      target_df <- no2_clean[no2_clean$cntr_id==target_cntr, ]
+      data.frame(cor=cor(target_df[, -c(1,2)])[str1, str2],
+                 cntr_id=target_df$cntr_id[1],
+                 cntr_name=target_df$cntr_name[1]) %>% 
+         mutate(r2=cor*cor) %>% 
+         rename(setNames('cor', paste0('cor (', str1, ' vs ', str2, ')')),
+                setNames('r2', paste0('r2 (', str1, ' vs ', str2, ')')))
+   }) %>% do.call(rbind, .)
+   eu_bnd <- st_read("../expanse_shp/eu_expanse2.shp")
+   unique(eu_bnd$CNTR_ID) %>% sort()
+   names(cor_v) <- toupper(names(cor_v))
+   cor_v <- cor_v %>% select(-CNTR_NAME)
+   cor_v_sp <- left_join(eu_bnd, cor_v, by=c('CNTR_ID'))
+   # plot(cor_v_sp[6], key.pos = 1, axes = TRUE, key.width = lcm(1.3), key.length = 1.0)
+   # plot(cor_v_sp[7], key.pos = 1, axes = TRUE, key.width = lcm(1.3), key.length = 1.0)
    
-   no2 <- inner_join(no2_rf_pure, no2_rf_pure_l[unlist(lapply(no2_rf_pure_l, nrow))!=50887] %>%
-                        lapply(., function(df_all) df_all %>% select(system.index, matches('rf_'))) %>% 
-                        Reduce(
-                           function(x, y, ...) inner_join(x, y,  by='system.index', ...), 
-                           .
-                        )
-                     ,
-                     by='system.index')
-   no2_clean <- inner_join(no2_linear, no2, by=names(no2_linear)[names(no2_linear)%in%names(no2)])
-}else{
-   no2 <- Reduce(
-      function(x, y, ...) inner_join(x, y,  by=c('system.index', 'cntr_name', 'cntr_id'), ...), 
-      no2_rf_pure_l[unlist(lapply(no2_rf_pure_l, nrow))==50887] %>% 
-         lapply(., function(df_all) df_all %>% select(system.index, cntr_name, 
-                                                      cntr_id, matches('rf_')))
-   )
-   no2_clean <- inner_join(no2_linear, no2, by=names(no2_linear)[names(no2_linear)%in%names(no2)])
-}
-exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
-               'b1')
-no2_clean <- no2_clean[,!(names(no2_clean)%in%exc_names)]
-no2_clean <- no2_clean[,!grepl('gtwr', names(no2_clean))]
-names(no2_clean)
-no2_clean_pure <- no2_clean %>% select(-'cntr_id', -'cntr_name')
-no2_clean_name <- no2_clean %>% select('cntr_id', 'cntr_name')
-yrs_name <- substr(names(no2_clean_pure), nchar(names(no2_clean_pure))-3, nchar(names(no2_clean_pure))) %>% as.numeric()
-no2_clean_pure <- no2_clean_pure[, order(yrs_name)]
-scenarios_name <- substr(names(no2_clean_pure), nchar(names(no2_clean_pure))-9, nchar(names(no2_clean_pure))-5) 
-no2_clean_all <- no2_clean_pure[, order(scenarios_name)]
-
-# GWR vs RF (2012)
-yrs_name <- substr(names(no2_clean_pure), nchar(names(no2_clean_pure))-3, nchar(names(no2_clean_pure))) %>% as.numeric()
-no2_2010 <- cbind(no2_clean_name, no2_clean_pure[, yrs_name==2012])
-corr <- lapply(unique(no2_2010$cntr_id), function(cntr_id){
-   cor((no2_2010 %>% filter(cntr_id==cntr_id))[, -c(1,2)])
+   # tm_shape(cor_v_sp)+
+   #    tm_polygons(col=names(cor_v_sp)[6],
+   #                style = "fixed",
+   #                breaks = seq(0.2, 1, 0.2))+
+   #    tm_layout(legend.outside = TRUE) 
+   r2tmap <- tm_shape(cor_v_sp)+
+      tm_polygons(col=names(cor_v_sp)[7],
+                  style = "fixed",
+                  breaks = seq(0.2, 1, 0.2),
+                  palette = c("#FF0000", "#FFA500", '#FFFF00', "#8FBC8F", "#4682B4"))+
+      tm_layout(legend.outside = TRUE) 
+   tmap_save(r2tmap, paste0('graph/rp_cntr_', str1, str2, '.tiff'),
+             dpi=150, height=4, width=6, units='in')
+   
 })
+
+
 # the correlation does not vary with country
 lapply(corr, `[[`, 2) %>% unlist
 #
@@ -249,7 +290,7 @@ plotM(no2_clean_all[, grepl('2000', names(no2_clean_all))], F, range_limit)
 for(yr in 2000:2018){
    print(yr)
    png(paste0("results/figures/randomPoints", target_poll, '_', yr,'.png'),
-       height=12, width=15, units='in', res=300)
+       height=12, width=16.5, units='in', res=300)
    print(plotM(no2_clean_all[, grepl(yr, names(no2_clean_all))], F, range_limit, yr)+
             theme(strip.placement = "outside", text = element_text(size = 17)))
    dev.off()
