@@ -1,5 +1,5 @@
 outputGTWR <- function(sp_train1, gtwr_yr, target_poll, eq,
-                      grd, lamda=0.1, ksi=0, conv_dist=1000){
+                      grd, lamda=0.2, ksi=0, conv_dist=5000){
    #'@title Train GTWR with specified lamda and ksi
    #'@description Train GTWR with specified lamda and ksi and output the predictions
    #'@param sp_train1 the sp data frame of the training data
@@ -8,8 +8,11 @@ outputGTWR <- function(sp_train1, gtwr_yr, target_poll, eq,
    #'@param eq the linear regression equation for the GTWR 
    #'@param grd the spatial regression grid cell of the GTWR
    #'@param lamda the scale parameter balancing the effect of spatial and temporal distance 
-   #'@param ksi the parameter controlling for the interaction of the space and time effects
-   #'@param ksi the parameter of the equivalent spatial distance for the 1-year temporal distance 
+   #' (default=0.1)
+   #'@param ksi the parameter controlling for the interaction of the space and time effects 
+   #' (default=0)
+   #'@param conv_dist the parameter of the equivalent spatial distance (m) 
+   #'for the 1-year temporal distance (default=5000) 
    #'@return data frame object with gtwr as the GTWR predictions
    
    print(paste0('gtwr_yr ', gtwr_yr))
@@ -45,8 +48,8 @@ outputGTWR <- function(sp_train1, gtwr_yr, target_poll, eq,
                                                   reg.tv=rep(gtwr_yr, nrow(coordinates(grd))),
                                                   lamda = lamda, ksi=ksi,
                                                   t.dMat = abs(outer(sort(unique(as.numeric(as.character(sp_train1@data$year)))),
-                                                                     sort(unique(rep(2010, nrow(coordinates(grd))))), '-'))*conv_dist,  # One year apart between observations from the same stations in time 
-                                                                                                                                  #  is equal to one kilometer apart from the same year in space
+                                                                     sort(unique(rep(gtwr_yr, nrow(coordinates(grd))))), '-'))*conv_dist,  # One year apart between observations from the same stations in time 
+                                                                                                                                  #  is equal to five kilometer (if conv_dist=5000) apart from the same year in space
                                                   t.units = 'years'),
                                   lamda = lamda, ksi=ksi,
                                   t.units = 'years',
