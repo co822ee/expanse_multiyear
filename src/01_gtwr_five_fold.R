@@ -1,6 +1,4 @@
-# This script tunes the parameters for GTWR (lamda, ksi, and the equivalent temporal distance)
-# The difference between 00_optimize_gtwr.R and 00_optimize_gtwr2.R is that 
-# the former is fold-wise and the latter is paramater-grid-wise.
+# This script runs the 5-fold CV for GTWR
 
 #------ 1) Read in data ------
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
