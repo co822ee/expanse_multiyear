@@ -76,10 +76,10 @@ for(yr_i in seq_along(csv_names)){
       }) %>% do.call(rbind, .)
       
       final_perfm <- cbind(t(error_matrix(nfold_validation$obs, nfold_validation$gtwr)),
-            param[paramGrid_i, ],
+                           gtwr_param[param_i, ],
             data.frame(ndata=round(nrow(nfold_validation)/nrow(data_all)*100, 1)))
       
-      write.csv(final_perfm, paste0('data/workingData//gtwr_param_', param_i, '.csv'), row.names = F)
+      write.csv(final_perfm, paste0('data/workingData//gtwr_param_', csv_name, '_', param_i, '.csv'), row.names = F)
    }
    stopCluster(cl)
 }
