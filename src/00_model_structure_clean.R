@@ -13,6 +13,7 @@ source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 source("src/00_fun_read_data_gee.R")
 # Whether to tune RF
 tuneRF = T
+nfold <- 5
 # Multiple single years
 target_poll_v <- c('PM2.5', 'PM10', 'NO2', 'O3')
 csv_names <- lapply(target_poll_v, function(poll_name){
@@ -23,7 +24,7 @@ years <- list(2008:2010, 2009:2011, 2010:2012,
               2008:2012, 2006:2012, 2012:2019, 2000:2019)
 library(doParallel)
 library(foreach)
-## PM10 6:7 unfinished
+
 for(yr_i in seq_along(csv_names)){
    csv_name <- csv_names[yr_i]
    print("********************************************")
@@ -39,7 +40,7 @@ for(yr_i in seq_along(csv_names)){
       # The stations will only be included in one specific fold.
       data_all <- create_fold(df_sub, seed, strt_group=c("n_obs", "sta_type", "zoneID"), 
                                multiyear_group = c("sta_code", "year"),
-                               nfold = 5)
+                               nfold = nfold)
       
       
       cluster_no <- 5
