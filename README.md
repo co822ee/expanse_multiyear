@@ -45,8 +45,9 @@ In the folder src, you can find R code for implementing the multi-year modelling
 These two R scripts implements 5-fold cross-validation 
 
 
-``00_optimize_gtwr.R`` tunes the parameters for GTWR (lamda, ksi, and the equivalent temporal distance).
+``00_gtwr_optimize3.R`` tunes the parameters for GTWR (lamda, ksi, and the equivalent temporal distance) using 5-fold CV.
 
+``01_gtwr_five_fold.R`` outputs 5-fold predictions for GTWR with the optimized parameters.
 
 ### Output random forests predictions at random points
 ``01_combineRandomPointsPredictors.R``
