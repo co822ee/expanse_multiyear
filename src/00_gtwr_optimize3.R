@@ -6,7 +6,7 @@
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 library(doParallel)
 library(foreach)
-target_poll = 'NO2'
+target_poll = 'PM10'
 obs_varname = 'obs'
 # Multiple single years
 csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12', 
@@ -44,44 +44,49 @@ for(yr_i in seq_along(csv_names)){
       source('src/fun_create_regressionGrid.R')
       source('src/fun_gen_df_gtwr.R')
       source('src/fun_tuneGTWR.R')
+      if(!file.exists(paste0('data/workingData//gtwr_param_', csv_name, '_', param_i, '.csv'))){
+         #------ 2) Subset training and test for 5-CV (this should be the same as slr and rf) ------
+         source("src/00_fun_create_fold.R")
+         # The stations will only be included in one specific fold.
+         data_all <- create_fold(df_sub, seed, strt_group=c("n_obs", "sta_type", "zoneID"), 
+                                 multiyear_group = c("sta_code", "year"),
+                                 nfold = 5)
+         
+         nfold_validation <-  lapply(1:nfold, function(fold_i){
+            #------------------------------------------------------------
+            test_sub <- data_all[data_all$nfold==fold_i,]
+            train_sub <- data_all[-test_sub$index, ] #data_all$index starts from 1 to the length.
+            
+            sp_train <- creat_spPoints(train_sub, 'xcoord', 'ycoord', local_crs)
+            sp_test <- creat_spPoints(test_sub, 'xcoord', 'ycoord', local_crs)
+            
+            #------ 3) Read in the predictors selected by SLR (using the same full training data) ------
+            slr <- read.csv(paste0("data/workingData/SLR_summary_model_", csv_name, '_fold_', fold_i, '.csv'))
+            eq <- as.formula(paste0(obs_varname, '~',  paste(slr$variables[-1], collapse = "+")))
+            
+            grd2 <- create_regressionGrid(eu_bnd, 200000, local_crs)
+            
+            # Output the predictions at validation points using GTWR 
+            gtwr_valid <- lapply(years[[yr_i]], tuneGTWR, sp_train1=sp_train, grid_i=param_i,
+                                 sp_valid1=sp_test, valid_sub1=test_sub, 
+                                 target_poll=target_poll, eq=eq, grd=grd2, 
+                                 param=gtwr_param) %>% do.call(rbind, .) 
+            gtwr_valid  # Should have the same nrow as test_sub
+            
+         }) %>% do.call(rbind, .)
+         # Remove NA in the dataframe before using error_matrix (otherwise the matrix would be NA) 
+         ## (only for PM2.5 year 2000 there would be none validation datasets...)
+         nfold_validation <- nfold_validation[!is.na(nfold_validation$gtwr), ]
+         final_perfm <- cbind(t(error_matrix(nfold_validation$obs, nfold_validation$gtwr)),
+                              gtwr_param[param_i, ],
+                              data.frame(ndata=round(nrow(nfold_validation)/nrow(data_all)*100, 1)))
+         
+         write.csv(final_perfm, paste0('data/workingData//gtwr_param_', csv_name, '_', param_i, '.csv'), row.names = F)
+      }
       
-      #------ 2) Subset training and test for 5-CV (this should be the same as slr and rf) ------
-      source("src/00_fun_create_fold.R")
-      # The stations will only be included in one specific fold.
-      data_all <- create_fold(df_sub, seed, strt_group=c("n_obs", "sta_type", "zoneID"), 
-                              multiyear_group = c("sta_code", "year"),
-                              nfold = 5)
-      
-      nfold_validation <-  lapply(1:nfold, function(fold_i){
-         #------------------------------------------------------------
-         test_sub <- data_all[data_all$nfold==fold_i,]
-         train_sub <- data_all[-test_sub$index, ] #data_all$index starts from 1 to the length.
-         
-         sp_train <- creat_spPoints(train_sub, 'xcoord', 'ycoord', local_crs)
-         sp_test <- creat_spPoints(test_sub, 'xcoord', 'ycoord', local_crs)
-         
-         #------ 3) Read in the predictors selected by SLR (using the same full training data) ------
-         slr <- read.csv(paste0("data/workingData/SLR_summary_model_", csv_name, '_fold_', fold_i, '.csv'))
-         eq <- as.formula(paste0(obs_varname, '~',  paste(slr$variables[-1], collapse = "+")))
-         
-         grd2 <- create_regressionGrid(eu_bnd, 200000, local_crs)
-         
-         # Output the predictions at validation points using GTWR 
-         gtwr_valid <- lapply(years[[yr_i]], tuneGTWR, sp_train1=sp_train, grid_i=param_i,
-                              sp_valid1=sp_test, valid_sub1=test_sub, 
-                              target_poll=target_poll, eq=eq, grd=grd2, 
-                              param=gtwr_param) %>% do.call(rbind, .) 
-         gtwr_valid  # Should have the same nrow as test_sub
-         
-      }) %>% do.call(rbind, .)
-      
-      final_perfm <- cbind(t(error_matrix(nfold_validation$obs, nfold_validation$gtwr)),
-                           gtwr_param[param_i, ],
-            data.frame(ndata=round(nrow(nfold_validation)/nrow(data_all)*100, 1)))
-      
-      write.csv(final_perfm, paste0('data/workingData//gtwr_param_', csv_name, '_', param_i, '.csv'), row.names = F)
    }
    stopCluster(cl)
+   gc()
 }
 ## Does it necessary to calibrate the parameters?
 ## [Result 1: only calibrating ksi and lamda without setting conv_dist (default conv_dist=1)]
