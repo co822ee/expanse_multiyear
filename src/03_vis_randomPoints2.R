@@ -86,13 +86,92 @@ for(poll_i in 1:4){
    
    fwrite(no2, paste0('data/processed/prediction_random_fromR_', target_poll2), row.names=F)
    rm(list=c('no2_rf_pure_l', 'no2_rf_pure_l3', 'no2_l'))
+}
+#---------- AR plots --------
+calc_acf <- function(dat, varname, time_step){
+   out_dat <- acf(dat[, varname], plot=F, lag.max=(time_step-1)*12)$acf[-1]
+   out_dat <- as.data.frame(t(out_dat))
+   names(out_dat) <- paste0('ar_', 1:length(out_dat))
+   out_dat
+}
+acf_timeseries <- function(dat, target_str, target_poll){
    
-   names(no2)
+   # From wide to long data table
+   no2_wide <- cbind(dat[, c('system.index', 'cntr_id', 'cntr_name')], 
+                     dat[, grepl(target_str, names(dat))])
+   no2_long <- no2_wide %>% pivot_longer(., cols = -c('system.index', 'cntr_id', 'cntr_name'),
+                                         names_to = 'models',
+                                         values_to = 'predictions')
+   no2_long$year <- as.numeric(unlist(lapply(strsplit(no2_long$models, '_'), `[[`, 3)))
+   
+   no2_long <- no2_long %>% 
+      arrange(system.index, year)  # The data needs to be arranged from early times to later time
+   tperiod <- sort(unique(no2_long$year))
+   # dat_tbl <- table(dat$system.index)
+   acf_dat <- no2_long%>%
+      # filter(system.index%in%names(dat_tbl[dat_tbl==max(dat_tbl)])) %>% 
+      group_by(system.index) %>%
+      do(calc_acf(., 'predictions', length(tperiod)))
+   
+   acf_avg <- acf_dat[-1] %>% apply(., 2, mean)
+   # summarise(
+   #    acf1=acf(obs, plot = F)$acf[-1][1],
+   #    acf12=acf(obs, plot = F)$acf[-1][12],
+   #    acf24=acf(obs, plot = F)$acf[-1][24]
+   # )
+   ggplot(acf_dat %>% gather('ar', 'values', -'system.index') %>% mutate(lag=as.numeric(gsub('ar_', '', ar))))+
+      geom_line(aes(x=reorder(lag, lag), y=values, group=system.index), alpha=0.25)+
+      geom_line(data=acf_avg %>% t()%>% as.data.frame()%>% gather('ar', 'values') %>% mutate(lag=as.numeric(gsub('ar_', '', ar))), 
+                aes(x=reorder(lag, lag), y=values, group=1), col='red', lwd=1)+
+      geom_text(data=acf_avg %>% 
+                   t()%>% as.data.frame()%>% 
+                   gather('ar', 'values') %>% mutate(lag=as.numeric(gsub('ar_', '', ar))) %>% 
+                   filter(lag%in% c(1, seq(5, (5*length(tperiod)-1), 5))),
+                aes(label=round(values, 1), x=lag+0.2, y=0.9), col='red')+
+      geom_vline(xintercept = seq(5, (5*length(tperiod)-1), 5),
+                 lty=2)+
+      labs(title=paste0(target_str, ' (', target_poll, ') ', min(tperiod), '-', max(tperiod)),
+           subtitle=paste0('no. of stations=', nrow(acf_dat)),
+           x='lag (year)', y='autocorrelation')+
+      scale_x_discrete(breaks = c(1, seq(5, (12*length(tperiod)-1), 5)))
+   # geom_abline(intercept = 0, slope=1)
+}
+plot_ar <- function(poll_i){
+   target_poll <- target_polls[poll_i]      #'NO2'    # PM25
+   target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
+   
+   
+   no2 <- fread(paste0('data/processed/prediction_random_fromR_', target_poll2)) %>% as.data.frame()
+   exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
+                  'b1')
+   acf_timeseries(no2, 'slr_20', target_poll)
+   acf_timeseries(no2, 'gwr_20', target_poll)
+   acf_timeseries(no2, 'rf_20', target_poll)
+   
+   acf_timeseries(no2, 'slr_00.19', target_poll)
+   acf_timeseries(no2, 'rf_00.19', target_poll)
+   
+   
+   # no2_clean_pure <- no2_clean %>% dplyr::select(-'cntr_id', -'cntr_name')
+   # no2_clean_name <- no2_clean %>% dplyr::select('cntr_id', 'cntr_name')
+   # yrs_name <- substr(names(no2_clean_pure), nchar(names(no2_clean_pure))-3, nchar(names(no2_clean_pure))) %>% as.numeric()
+   # no2_clean_pure <- no2_clean_pure[, order(yrs_name)]
+   # scenarios_name <- paste0(unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 1)), '_', unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 2)))
+   # no2_clean_pure <- no2_clean_pure[, order(scenarios_name)]
+   
+   
+}
+#------------ Correlation plots ------------
+for(poll_i in 1:4){
+   target_poll <- target_polls[poll_i]      #'NO2'    # PM25
+   target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
+   
+   
+   no2 <- fread(paste0('data/processed/prediction_random_fromR_', target_poll2)) %>% as.data.frame()
    exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
                   'b1')
    
-   no2_clean <- no2[,!(names(no2)%in%exc_names)]
-   no2_clean <- no2_clean[,!grepl('gtwr', names(no2_clean))]
+   no2_clean <- no2[, which(!(names(no2)%in%exc_names))]
    names(no2_clean)
    no2_clean_pure <- no2_clean %>% dplyr::select(-'cntr_id', -'cntr_name')
    no2_clean_name <- no2_clean %>% dplyr::select('cntr_id', 'cntr_name')
@@ -100,29 +179,19 @@ for(poll_i in 1:4){
    no2_clean_pure <- no2_clean_pure[, order(yrs_name)]
    scenarios_name <- paste0(unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 1)), '_', unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 2)))
    no2_clean_pure <- no2_clean_pure[, order(scenarios_name)]
-   # no2_clean <- no2_clean[, mixedsort(names(no2_clean))]
    
-   names(no2_clean_pure)
-   yr=2018
-   no2_clean_p <- no2_clean[, grepl(yr, names(no2_clean))]
-   # gather(no2_clean_p, 'model', 'values', )
    
-   # data_df <- no2_clean[, grepl('2018', names(no2_clean))]
-   
-   plotM <- function(data_df, colorZone=F, lim_range, gtitle, sameYr=T){
+   plotM <- function(data_df, colorZone=F, gtitle, sameYr=T){
       if(sameYr){
-         names(data_df) <- substr(names(data_df), 1, nchar(names(data_df))-4)
+         names(data_df) <- paste0(unlist(lapply(strsplit(names(data_df), '_'), `[[`, 1)),
+                                  unlist(lapply(strsplit(names(data_df), '_'), `[[`, 2)))
+         # substr(names(data_df), 1, nchar(names(data_df))-4)
       }else{
          names(data_df) <- unlist(lapply(strsplit(names(data_df), '_'), `[[`, 3))
       }
-      # data_df <- dcast(data_df,
-      #                    # as.formula(paste0('station_european_code+zone.name~', time_var)), 
-      #                    value.var = 'conc')
+      data_df <- data_df[, mixedorder(names(data_df))]
+      lim_range <- c(min(data_df), max(data_df))
       
-      # upper.panel <- function(x, y){
-      #    points(x, y,xlim=c(-2,220), ylim=c(-2,220))
-      #    abline(0,1, col='red')
-      # }
       lowerFn <- function(data, mapping, ...) {
          p <- ggplot(data = data, mapping = mapping) +
             geom_point(colour = "black") +
@@ -146,66 +215,60 @@ for(poll_i in 1:4){
          )
       }
    }
-   # png(paste0("graph/randomPoints", target_poll, '.png'),
-   #      height=12, width=16.5, units='in', res=300)
-   # plotM(no2_clean, F, range_limit, '2008')
-   # dev.off()
-   if(target_poll=='NO2'){
-      range_limit <- c(0, 125)
-   }else if(target_poll=='O3'){
-      range_limit <- c(0, 120)
-   }else{
-      range_limit <- c(0, 35)
-   }
-   
-   # For the same year and different algorithms
-   # plotM(no2_clean[, grepl('2018', names(no2_clean))], F, range_limit, '2018')+
+  
+   ## Plot predictions for different years using the same algorithm (year-wise)
+   # # 1. single-year SLR
+   # png(paste0("graph/randomPoints", target_poll, '_slr.png'),
+   #     height=12, width=16.5, units='in', res=300)
+   # plotM(no2_clean[, grepl('slr_20', names(no2_clean))], F, 'Single-year SLR', F)+
    #    theme(strip.placement = "outside", text = element_text(size = 13))
+   # dev.off()
    # 
+   # # 2. single-year GWR
+   # png(paste0("graph/randomPoints", target_poll, '_gwr.png'),
+   #     height=12, width=16.5, units='in', res=100)
+   # plotM(no2_clean[, grepl('gwr_20', names(no2_clean))], F, 'Single-year GWR', F)+
+   #    theme(strip.placement = "outside", text = element_text(size = 13))
+   # dev.off()
    # 
-   # plotM(no2_clean[, grepl('2012', names(no2_clean))], F, range_limit, '2012')
-   # plotM(no2_clean[, grepl('2009', names(no2_clean))], F, range_limit, '2009')
-   # plotM(no2_clean[, grepl('2000', names(no2_clean))], F, range_limit, '2000')
+   # # 3. single-year random forests
+   # png(paste0("graph/randomPoints", target_poll, '_rf.png'),
+   #     height=12, width=16.5, units='in', res=100)
+   # plotM(no2_clean[, grepl('rf_20', names(no2_clean))], F, 'Single-year RF', F)+
+   #    theme(strip.placement = "outside", text = element_text(size = 13))
+   # dev.off()
+   # 
+   # # 4. multiple-year SLR
+   # png(paste0("graph/randomPoints", target_poll, '_mslr.png'),
+   #     height=12, width=16.5, units='in', res=100)
+   # plotM(no2_clean[, grepl('slr_00.19', names(no2_clean))], F, 'Multiple-year SLR', F)+
+   #    theme(strip.placement = "outside", text = element_text(size = 13))
+   # dev.off()
+   # 
+   # # 5. multiple-year random forests
+   # png(paste0("graph/randomPoints", target_poll, '_mrf.png'),
+   #     height=12, width=16.5, units='in', res=100)
+   # plotM(no2_clean[, grepl('rf_00.19', names(no2_clean))], F, 'Multiple-year RF', F)+
+   #    theme(strip.placement = "outside", text = element_text(size = 13))
+   # dev.off()
+   # 
+   # # 6. multiple-year GTWR
+   # png(paste0("graph/randomPoints", target_poll, '_gtwr.png'),
+   #     height=12, width=16.5, units='in', res=100)
+   # plotM(no2_clean[, grepl('gtwr_00.19', names(no2_clean))], F, 'multiple-year GTWR', F)+
+   #    theme(strip.placement = "outside", text = element_text(size = 13))
+   # dev.off()
+   # 
    
-   ## Plot predictions for different years using the same algorithm
-   
-   # 1. single-year SLR
-   png(paste0("graph/randomPoints", target_poll, '_slr.png'),
-       height=12, width=16.5, units='in', res=300)
-   plotM(no2_clean[, grepl('slr_20', names(no2_clean))], F, range_limit, 'Single-year SLR', F)+
-      theme(strip.placement = "outside", text = element_text(size = 13))
-   dev.off()
-   
-   # 2. single-year GWR
-   png(paste0("graph/randomPoints", target_poll, '_gwr.png'),
-       height=12, width=16.5, units='in', res=100)
-   plotM(no2_clean[, grepl('gwr_20', names(no2_clean))], F, range_limit, 'Single-year GWR', F)+
-      theme(strip.placement = "outside", text = element_text(size = 13))
-   dev.off()
-   
-   # 3. single-year random forests
-   png(paste0("graph/randomPoints", target_poll, '_rf.png'),
-       height=12, width=16.5, units='in', res=100)
-   plotM(no2_clean[, grepl('rf_20', names(no2_clean))], F, range_limit, 'Single-year RF', F)+
-      theme(strip.placement = "outside", text = element_text(size = 13))
-   dev.off()
-   
-   # 4. multiple-year SLR
-   png(paste0("graph/randomPoints", target_poll, '_mslr.png'),
-       height=12, width=16.5, units='in', res=100)
-   plotM(no2_clean[, grepl('slr_00.19', names(no2_clean))], F, range_limit, 'Multiple-year SLR', F)+
-      theme(strip.placement = "outside", text = element_text(size = 13))
-   dev.off()
-   
-   # 5. multiple-year random forests
-   png(paste0("graph/randomPoints", target_poll, '_mrf.png'),
-       height=12, width=16.5, units='in', res=100)
-   plotM(no2_clean[, grepl('rf_00.19', names(no2_clean))], F, range_limit, 'Multiple-year RF', F)+
-      theme(strip.placement = "outside", text = element_text(size = 13))
-   dev.off()
-   
-   
-   
+   lapply(c(2000, 2005, 2010, 2015, 2019),
+          function(yr){
+             no2_clean_p <- no2_clean[, grepl(yr, names(no2_clean))]
+             png(paste0("graph/randomPoints", target_poll, '_', yr, '_gtwr.png'),
+                 height=8, width=7.8, units='in', res=100)
+             plotM(no2_clean_p, F, yr, T)+
+                theme(strip.placement = "outside", text = element_text(size = 13))
+             dev.off()
+          })
    
    ### Plot the scatterplots of predictions at random points
    ## from different algorithms.
@@ -273,7 +336,6 @@ for(poll_i in 1:4){
          tm_layout(legend.outside = TRUE) 
       tmap_save(r2tmap, paste0('graph/rp_cntr_', target_polls2, '_', str1, str2, '.tiff'),
                 dpi=150, height=4, width=6, units='in')
-      
    })
    
 }
