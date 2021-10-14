@@ -260,15 +260,15 @@ for(poll_i in 1:4){
    # dev.off()
    # 
    
-   lapply(c(2000, 2005, 2010, 2015, 2019),
-          function(yr){
-             no2_clean_p <- no2_clean[, grepl(yr, names(no2_clean))]
-             png(paste0("graph/randomPoints", target_poll, '_', yr, '_gtwr.png'),
-                 height=8, width=7.8, units='in', res=100)
-             plotM(no2_clean_p, F, yr, T)+
-                theme(strip.placement = "outside", text = element_text(size = 13))
-             dev.off()
-          })
+   lapply(c(2000, 2005, 2010, 2015, 2019), function(yr){
+      print(yr)
+      no2_clean_p <- no2_clean[, grepl(yr, names(no2_clean))]
+      png(paste0("graph/randomPoints", target_poll, '_', yr, '.png'),
+          height=8, width=7.8, units='in', res=100)
+      print(plotM(no2_clean_p, F, yr, T)+
+               theme(strip.placement = "outside", text = element_text(size = 13)))
+      dev.off()
+   })
    
    ### Plot the scatterplots of predictions at random points
    ## from different algorithms.
