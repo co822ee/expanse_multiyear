@@ -5,6 +5,8 @@ library(reshape2)
 library(ggplot2)
 library(GGally)
 library(sf)
+library(APMtools)
+library(gridExtra)
 target_poll <- 'NO2'    # PM25
 target_poll2 <- 'NO2'   # PM2.5
 escape_obs <- 'no2'
@@ -80,7 +82,7 @@ plotEscapeR2 <- function(poll_i){
    elapseRMSE <- RMSEs[poll_i]          ### 11.47 for no2 3.41 for pm25
    no2 <- read.csv(paste0('data/processed/prediction_escape_fromR_', target_poll2))
    
-   no2_clean <- no2[, grepl('slr|gwr|rf', names(no2))]
+   no2_clean <- no2[, grepl('slr|gwr|rf|gtwr', names(no2))]
    no2_clean <- no2_clean[, !grepl('no2lurfull', names(no2_clean))]
    model_years <- lapply(strsplit(names(no2_clean), "_"), `[[`, 3) %>% unlist
    # Select predictions for the year 2010
@@ -186,7 +188,7 @@ plotEscapeRMSE <- function(poll_i){
    elapseRMSE <- RMSEs[poll_i]          ### 11.47 for no2 3.41 for pm25
    no2 <- read.csv(paste0('data/processed/prediction_escape_fromR_', target_poll2))
    
-   no2_clean <- no2[, grepl('slr|gwr|rf', names(no2))]
+   no2_clean <- no2[, grepl('slr|gwr|rf|gtwr', names(no2))]
    no2_clean <- no2_clean[, !grepl('no2lurfull', names(no2_clean))]
    model_years <- lapply(strsplit(names(no2_clean), "_"), `[[`, 3) %>% unlist
    # Select predictions for the year 2010
@@ -355,7 +357,7 @@ dev.off()
 # no2sub <- no2[no2$allid%in%pm25$allid, ]
 # exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo')
 # no2sub <- no2sub[,!(names(no2sub)%in%exc_names)]
-# no2_clean <- no2sub[,grepl('slr|rf|gwr', names(no2sub))]
+# no2_clean <- no2sub[,grepl('slr|rf|gwr|gtwr', names(no2sub))]
 # no2_clean <- no2_clean[, !grepl('no2lurfull', names(no2_clean))]
 # names(no2_clean)
 # model_years <- lapply(strsplit(names(no2_clean), "_"), `[[`, 3) %>% unlist
