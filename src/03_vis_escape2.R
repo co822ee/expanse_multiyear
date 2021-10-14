@@ -100,6 +100,8 @@ plotEscapeR2 <- function(poll_i){
       range_limit <- c(0, 140)
    }else{
       range_limit <- c(0, 45)
+      ## Exclude 1st-version GTWR (remove this line after 2nd-version GTWR is done)
+      no2_clean <- no2_clean[, !grepl('gtwr', names(no2_clean))]
    }
    # Divide by country
    if(target_poll=='NO2'){
