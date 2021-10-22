@@ -31,6 +31,8 @@ write_output_5csv <- function(year_i){
    
    
    slr_test <- do.call(rbind, slr_test)
+   # # nfold=4 PM2.5 from year 2000-2003 (00-19) there are NAs
+   ## (because the error of optimizing the bandwidth size: error: inv(): matrix seems singular)
    gtwr_test <- do.call(rbind, gtwr_test)
    # slr_rf_test <- do.call(rbind, slr_rf_test)
    # gwr_test <- do.call(rbind, gwr_test)
