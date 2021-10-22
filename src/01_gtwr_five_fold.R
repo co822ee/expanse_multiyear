@@ -4,7 +4,7 @@
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 library(doParallel)
 library(foreach)
-target_poll = 'PM10'
+target_poll = 'PM2.5'
 obs_varname = 'obs'
 # Multiple single years
 csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12', 

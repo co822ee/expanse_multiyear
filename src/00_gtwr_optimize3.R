@@ -35,7 +35,7 @@ for(yr_i in seq_along(csv_names)){
                              ksi=seq(0, pi/2, pi/4), 
                              conv_dist=c(0.5, 1, 3, 5, 10, 20, 40)*1000)  # unit of conv_dist: meter/time-unit (here the time-unit=year)
    
-   cluster_no <- 5
+   cluster_no <- 3
    cl <- parallel::makeCluster(cluster_no)
    doParallel::registerDoParallel(cl)
    foreach(param_i = 1:nrow(gtwr_param))  %dopar%  {
@@ -80,14 +80,19 @@ for(yr_i in seq_along(csv_names)){
          final_perfm <- cbind(t(error_matrix(nfold_validation$obs, nfold_validation$gtwr)),
                               gtwr_param[param_i, ],
                               data.frame(ndata=round(nrow(nfold_validation)/nrow(data_all)*100, 1)))
-         
+         print(paste0('write CSV file: data/workingData//gtwr_param_', csv_name, '_', param_i, '.csv'))
          write.csv(final_perfm, paste0('data/workingData//gtwr_param_', csv_name, '_', param_i, '.csv'), row.names = F)
       }
       
    }
    stopCluster(cl)
    gc()
+   removeTmpFiles(24) ## delete
+   rm(list=ls()[!ls()%in%c('csv_names', 'target_poll', 'obs_varname', 'years', 'yr_i', 'nfold', 'csv_name', 'df_sub', 'gtwr_param')])
 }
+stopCluster(cl)
+gc()
+
 ## Does it necessary to calibrate the parameters?
 ## [Result 1: only calibrating ksi and lamda without setting conv_dist (default conv_dist=1)]
 ## It seems that ksi=0 and lamda=0.1 would give the best result
