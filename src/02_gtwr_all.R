@@ -1,8 +1,9 @@
+rm(list=ls())
 # This script runs the 5-fold CV for GTWR
 if(!dir.exists('data/workingData/gtwr_coef/')) dir.create('data/workingData/gtwr_coef/')
 #------ 1) Read in data ------
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
-target_poll = 'O3'
+target_poll = 'PM2.5'
 obs_varname = 'obs'
 # Multiple single years
 csv_names <- paste0('all_',target_poll, "_",c('08-10', '09-11', '10-12', 
@@ -55,18 +56,24 @@ outputGTWRcoef <- function(yr_i){
       if(yr_i==7){
          source('../EXPANSE_algorithm/scr/fun_plot_gwr_coef.R')
          lapply(seq_along(gtwr_model), function(i){
-            plot_gwr_coef(1, gtwr_model[[i]], csv_name=paste0(csv_name, '_', years[[yr_i]][i]),
-                          3,3,eu_bnd)
+            if(target_poll=='PM2.5'){
+               plot_gwr_coef(1, gtwr_model[[i]], csv_name=paste0(csv_name, '_', years[[yr_i]][i]),
+                             3,4,eu_bnd)
+            }else{
+               plot_gwr_coef(1, gtwr_model[[i]], csv_name=paste0(csv_name, '_', years[[yr_i]][i]),
+                             3,3,eu_bnd)
+            }
          })
       }
       writeRaster(gtwr_coef, paste0('data/workingData/gtwr_coef/', csv_name, '.tif'),
                   overwrite=T)
+      gc()
    }else{
       gtwr_coef <- stack(paste0('data/workingData/gtwr_coef/', csv_name, '.tif'))
    }
    
    gtwr_coef
-   gc()
+   
 }
 gtwr_coef <- lapply(seq_along(csv_names), outputGTWRcoef) %>% do.call(stack, .)
 # output the parameter surfaces
@@ -74,5 +81,8 @@ writeRaster(gtwr_coef, paste0('data/workingData/gtwr_coef/gtwr_', target_poll,'.
             overwrite=T)
 # Check the amount of layers with slr multiple year results
 print('Check the amount of layers with slr multiple year results')
-read.csv('data/processed/combined/SLRcoef_all_multiYears.csv') %>% filter(poll=='NO2') %>% dim()
-dim(gtwr_coef)
+read.csv('data/processed/combined/SLRcoef_all_multiYears.csv') %>% 
+   filter(poll=='PM2.5') %>% dim()
+dim(stack('data/workingData/gtwr_coef/gtwr_PM2.5.tif'))
+# dim(stack('data/workingData/gtwr_coef/all_PM2.5_00-19.tif'))
+# dim(stack('data/workingData/gtwr_coef/all_PM2.5_08-10.tif'))
