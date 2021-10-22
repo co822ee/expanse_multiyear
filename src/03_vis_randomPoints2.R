@@ -7,12 +7,13 @@ library(GGally)
 library(sf)
 library(data.table)
 library(tmap)
+library(rlang)
 target_polls <- c('NO2', 'PM25', 'PM10', 'O3')
 target_polls2 <- c('NO2', 'PM2.5', 'PM10', 'O3')
 
 
 
-
+# Combine data
 for(poll_i in 1:4){
    target_poll <- target_polls[poll_i]      #'NO2'    # PM25
    target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
@@ -87,80 +88,7 @@ for(poll_i in 1:4){
    fwrite(no2, paste0('data/processed/prediction_random_fromR_', target_poll2), row.names=F)
    rm(list=c('no2_rf_pure_l', 'no2_rf_pure_l3', 'no2_l'))
 }
-#---------- AR plots --------
-calc_acf <- function(dat, varname, time_step){
-   out_dat <- acf(dat[, varname], plot=F, lag.max=(time_step-1)*12)$acf[-1]
-   out_dat <- as.data.frame(t(out_dat))
-   names(out_dat) <- paste0('ar_', 1:length(out_dat))
-   out_dat
-}
-acf_timeseries <- function(dat, target_str, target_poll){
-   
-   # From wide to long data table
-   no2_wide <- cbind(dat[, c('system.index', 'cntr_id', 'cntr_name')], 
-                     dat[, grepl(target_str, names(dat))])
-   no2_long <- no2_wide %>% pivot_longer(., cols = -c('system.index', 'cntr_id', 'cntr_name'),
-                                         names_to = 'models',
-                                         values_to = 'predictions')
-   no2_long$year <- as.numeric(unlist(lapply(strsplit(no2_long$models, '_'), `[[`, 3)))
-   
-   no2_long <- no2_long %>% 
-      arrange(system.index, year)  # The data needs to be arranged from early times to later time
-   tperiod <- sort(unique(no2_long$year))
-   # dat_tbl <- table(dat$system.index)
-   acf_dat <- no2_long%>%
-      # filter(system.index%in%names(dat_tbl[dat_tbl==max(dat_tbl)])) %>% 
-      group_by(system.index) %>%
-      do(calc_acf(., 'predictions', length(tperiod)))
-   
-   acf_avg <- acf_dat[-1] %>% apply(., 2, mean)
-   # summarise(
-   #    acf1=acf(obs, plot = F)$acf[-1][1],
-   #    acf12=acf(obs, plot = F)$acf[-1][12],
-   #    acf24=acf(obs, plot = F)$acf[-1][24]
-   # )
-   ggplot(acf_dat %>% gather('ar', 'values', -'system.index') %>% mutate(lag=as.numeric(gsub('ar_', '', ar))))+
-      geom_line(aes(x=reorder(lag, lag), y=values, group=system.index), alpha=0.25)+
-      geom_line(data=acf_avg %>% t()%>% as.data.frame()%>% gather('ar', 'values') %>% mutate(lag=as.numeric(gsub('ar_', '', ar))), 
-                aes(x=reorder(lag, lag), y=values, group=1), col='red', lwd=1)+
-      geom_text(data=acf_avg %>% 
-                   t()%>% as.data.frame()%>% 
-                   gather('ar', 'values') %>% mutate(lag=as.numeric(gsub('ar_', '', ar))) %>% 
-                   filter(lag%in% c(1, seq(5, (5*length(tperiod)-1), 5))),
-                aes(label=round(values, 1), x=lag+0.2, y=0.9), col='red')+
-      geom_vline(xintercept = seq(5, (5*length(tperiod)-1), 5),
-                 lty=2)+
-      labs(title=paste0(target_str, ' (', target_poll, ') ', min(tperiod), '-', max(tperiod)),
-           subtitle=paste0('no. of stations=', nrow(acf_dat)),
-           x='lag (year)', y='autocorrelation')+
-      scale_x_discrete(breaks = c(1, seq(5, (12*length(tperiod)-1), 5)))
-   # geom_abline(intercept = 0, slope=1)
-}
-plot_ar <- function(poll_i){
-   target_poll <- target_polls[poll_i]      #'NO2'    # PM25
-   target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
-   
-   
-   no2 <- fread(paste0('data/processed/prediction_random_fromR_', target_poll2)) %>% as.data.frame()
-   exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
-                  'b1')
-   acf_timeseries(no2, 'slr_20', target_poll)
-   acf_timeseries(no2, 'gwr_20', target_poll)
-   acf_timeseries(no2, 'rf_20', target_poll)
-   
-   acf_timeseries(no2, 'slr_00.19', target_poll)
-   acf_timeseries(no2, 'rf_00.19', target_poll)
-   
-   
-   # no2_clean_pure <- no2_clean %>% dplyr::select(-'cntr_id', -'cntr_name')
-   # no2_clean_name <- no2_clean %>% dplyr::select('cntr_id', 'cntr_name')
-   # yrs_name <- substr(names(no2_clean_pure), nchar(names(no2_clean_pure))-3, nchar(names(no2_clean_pure))) %>% as.numeric()
-   # no2_clean_pure <- no2_clean_pure[, order(yrs_name)]
-   # scenarios_name <- paste0(unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 1)), '_', unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 2)))
-   # no2_clean_pure <- no2_clean_pure[, order(scenarios_name)]
-   
-   
-}
+
 #------------ Correlation plots ------------
 for(poll_i in 1:4){
    target_poll <- target_polls[poll_i]      #'NO2'    # PM25
@@ -168,6 +96,9 @@ for(poll_i in 1:4){
    
    
    no2 <- fread(paste0('data/processed/prediction_random_fromR_', target_poll2)) %>% as.data.frame()
+   if(poll_i%in%c(3)){
+      no2 <- no2[, !grepl('gtwr', names(no2))]
+   }
    exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
                   'b1')
    
@@ -184,38 +115,79 @@ for(poll_i in 1:4){
    plotM <- function(data_df, colorZone=F, gtitle, sameYr=T){
       if(sameYr){
          names(data_df) <- paste0(unlist(lapply(strsplit(names(data_df), '_'), `[[`, 1)),
+                                  '_',
                                   unlist(lapply(strsplit(names(data_df), '_'), `[[`, 2)))
-         # substr(names(data_df), 1, nchar(names(data_df))-4)
       }else{
          names(data_df) <- unlist(lapply(strsplit(names(data_df), '_'), `[[`, 3))
       }
       data_df <- data_df[, mixedorder(names(data_df))]
       lim_range <- c(min(data_df), max(data_df))
+      border <- as.factor(unlist(lapply(strsplit(names(data_df), '_'), `[[`, 1)))
       
       lowerFn <- function(data, mapping, ...) {
-         p <- ggplot(data = data, mapping = mapping) +
-            geom_point(colour = "black") +
-            geom_abline(intercept=0, slope=1, col='red')+
-            lims(x=lim_range,y=lim_range)
-         p
+         namex <- strsplit(as_name(mapping$x), '_')[[1]][1]
+         namey <- strsplit(as_name(mapping$y), '_')[[1]][1]
+         if(namex == namey){
+            p <- ggplot(data = data, mapping = mapping) +
+               geom_point(colour = "black") +
+               geom_abline(intercept=0, slope=1, col='red')+
+               lims(x=lim_range,y=lim_range)+
+               theme(panel.background = element_rect(colour='blue', linetype = 3, size = 2))
+            p
+         }else{
+            p <- ggplot(data = data, mapping = mapping) +
+               geom_point(colour = "black") +
+               geom_abline(intercept=0, slope=1, col='red')+
+               lims(x=lim_range,y=lim_range)
+            p
+         }
       }
+      upperFn <- function(data, mapping, method="p", use="pairwise", ...){
+         
+         # grab data
+         x <- eval_data_col(data, mapping$x)
+         y <- eval_data_col(data, mapping$y)
+         
+         # calculate correlation
+         corr <- cor(x, y, method=method, use=use)
+         
+         # calculate colour based on correlation value
+         colFn <- colorRampPalette(c("dodgerblue4", "floralwhite", "firebrick1"), interpolate ='spline')
+         fill <- colFn(100)[findInterval(corr, seq(0.5, 1, length=100))]
+         
+         #make plot
+         ggally_cor(data = data, mapping = mapping,  ...) +
+            theme_void() +
+            theme(panel.background = element_rect(fill=fill), 
+                  panel.border=element_blank(), 
+                  axis.line=element_line()
+                  # strip.text = element_text(face="bold", colour="red", size = 5)
+                  )
+         
+      }
+
+
       if(colorZone){
          ggpairs(data=data_df, lower = list(continuous = wrap(lowerFn)),
-                 upper = list(continuous = wrap("cor", size=5)),
+                 upper = list(continuous = wrap(upperFn, size=5)),
                  diag=list(discrete="barDiag", 
                            continuous = wrap("densityDiag", alpha=0.5)),
                  mapping=ggplot2::aes(colour=zone.name), title=gtitle
-         )
+         )+
+            theme(panel.border=element_blank(), axis.line=element_line())
       }else{
          ggpairs(data=data_df, lower = list(continuous = wrap(lowerFn)),
-                 upper = list(continuous = wrap("cor", size=5)),
+                 upper = list(continuous = wrap(upperFn, size=5)),
                  diag=list(discrete="barDiag", 
                            continuous = wrap("densityDiag", alpha=0.5)), 
                  title=gtitle
-         )
+         )+
+            theme(panel.border=element_blank(), axis.line=element_line())
       }
    }
-  
+   
+   
+   ### 1) Compare predictions from different years using the same algorithms
    ## Plot predictions for different years using the same algorithm (year-wise)
    # # 1. single-year SLR
    # png(paste0("graph/randomPoints", target_poll, '_slr.png'),
@@ -260,17 +232,29 @@ for(poll_i in 1:4){
    # dev.off()
    # 
    
+   
+   ## 2) Compare different algorithms for the same year
    lapply(c(2000, 2005, 2010, 2015, 2019), function(yr){
       print(yr)
       no2_clean_p <- no2_clean[, grepl(yr, names(no2_clean))]
-      png(paste0("graph/randomPoints", target_poll, '_', yr, '.png'),
-          height=8, width=7.8, units='in', res=100)
+
+      if(yr==2005){
+         png(paste0("graph/randomPoints", target_poll, '_', yr, '.png'),
+             height=10, width=9.5, units='in', res=100)
+      }else if(yr==2010){
+         png(paste0("graph/randomPoints", target_poll, '_', yr, '.png'),
+             height=15, width=14.5, units='in', res=100)
+      }else{
+         png(paste0("graph/randomPoints", target_poll, '_', yr, '.png'),
+             height=8, width=7.8, units='in', res=100)
+      }
       print(plotM(no2_clean_p, F, yr, T)+
                theme(strip.placement = "outside", text = element_text(size = 13)))
       dev.off()
+
    })
    
-   ### Plot the scatterplots of predictions at random points
+   ### 3) Plot the scatterplots of predictions at random points
    ## from different algorithms.
    # mrf_wide <- lapply(3:ncol(no2_clean), function(col_index){
    #    target_df <- no2_clean[, c(1,2, col_index)] 
@@ -286,58 +270,104 @@ for(poll_i in 1:4){
    # rm(mrf_wide)
    # names(all_algorithms)
    # all_algorithms$model %>% unique
-   
-   strs_v <- data.frame(str1='slr_2010_2010',
-                        str2=c('slr_2019_2019', 
-                               'slr_2015_2015',
-                               'slr_2005_2005',
-                               'slr_2000_2000'))
-   strs_v <- data.frame(str1='rf_2010_2010',
-                        str2=c('rf_2019_2019', 
-                               'rf_2015_2015',
-                               'rf_2005_2005',
-                               'rf_2000_2000'))
-   strs_v <- data.frame(str1='gwr_2010_2010',
-                        str2=c('gwr_2019_2019', 
-                               'gwr_2015_2015',
-                               'gwr_2005_2005',
-                               'gwr_2000_2000'))
-   
-   lapply(1:nrow(strs_v), function(i){
-      str1 <- strs_v[i, 1]
-      str2 <- strs_v[i, 2]
-      cor_v <- lapply(unique(no2_clean$cntr_id), function(target_cntr){
-         target_df <- no2_clean[no2_clean$cntr_id==target_cntr, ]
-         data.frame(cor=cor(target_df[, -c(1,2)])[str1, str2],
-                    cntr_id=target_df$cntr_id[1],
-                    cntr_name=target_df$cntr_name[1]) %>% 
-            mutate(r2=cor*cor) %>% 
-            rename(setNames('cor', paste0('cor (', str1, ' vs ', str2, ')')),
-                   setNames('r2', paste0('r2 (', str1, ' vs ', str2, ')')))
-      }) %>% do.call(rbind, .)
-      eu_bnd <- st_read("../expanse_shp/eu_expanse2.shp")
-      unique(eu_bnd$CNTR_ID) %>% sort()
-      names(cor_v) <- toupper(names(cor_v))
-      cor_v <- cor_v %>% select(-CNTR_NAME)
-      cor_v_sp <- left_join(eu_bnd, cor_v, by=c('CNTR_ID'))
-      # plot(cor_v_sp[6], key.pos = 1, axes = TRUE, key.width = lcm(1.3), key.length = 1.0)
-      # plot(cor_v_sp[7], key.pos = 1, axes = TRUE, key.width = lcm(1.3), key.length = 1.0)
+   if(poll_i%in%c(3)){
+      strs_v1 <- data.frame(str1='slr_2010_2010',
+                            str2=c('gwr_2010_2010', 
+                                   # 'slr_00.19_2010',
+                                   'rf_2010_2010'
+                                   # 'rf_00.19_2010',
+                            ))
+      strs_v2 <- data.frame(str1='gwr_2010_2010',
+                            str2=c( 
+                               # 'slr_00.19_2010',
+                               'rf_2010_2010'
+                               # 'rf_00.19_2010',
+                            ))
       
-      # tm_shape(cor_v_sp)+
-      #    tm_polygons(col=names(cor_v_sp)[6],
-      #                style = "fixed",
-      #                breaks = seq(0.2, 1, 0.2))+
-      #    tm_layout(legend.outside = TRUE) 
-      r2tmap <- tm_shape(cor_v_sp)+
-         tm_polygons(col=names(cor_v_sp)[7],
-                     style = "fixed",
-                     breaks = seq(0.2, 1, 0.2),
-                     palette = c("#FF0000", "#FFA500", '#FFFF00', "#8FBC8F", "#4682B4"))+
-         tm_layout(legend.outside = TRUE) 
-      tmap_save(r2tmap, paste0('graph/rp_cntr_', target_polls2, '_', str1, str2, '.tiff'),
-                dpi=150, height=4, width=6, units='in')
-   })
-   
+      strs_v3 <- NULL
+   }else if(poll_i==4){  # O3
+      strs_v1 <- data.frame(str1='slr_2010_2010',
+                            str2=c('gwr_2010_2010', 
+                                   'slr_00.19_2010',
+                                   'rf_2010_2010',
+                                   'rf_00.19_2010'
+                            ))
+      strs_v2 <- data.frame(str1='gwr_2010_2010',
+                            str2=c( 
+                               'slr_00.19_2010',
+                               'rf_2010_2010',
+                               'rf_00.19_2010'
+                            ))
+      
+      strs_v3 <- data.frame(str1='rf_2010_2010',
+                            str2='rf_00.19_2010')
+   }else{
+      
+      
+      strs_v1 <- data.frame(str1='slr_2010_2010',
+                            str2=c('gwr_2010_2010', 
+                                   # 'slr_00.19_2010',
+                                   'rf_2010_2010',
+                                   # 'rf_00.19_2010',
+                                   'gtwr_00.19_2010'))
+      strs_v2 <- data.frame(str1='gwr_2010_2010',
+                            str2=c( 
+                               # 'slr_00.19_2010',
+                               'rf_2010_2010',
+                               # 'rf_00.19_2010',
+                               'gtwr_00.19_2010'))
+      
+      strs_v3 <- data.frame(str1='gtwr_00.19_2010',
+                            str2=c( 
+                               # 'slr_00.19_2010',
+                               'rf_2010_2010'
+                               # 'rf_00.19_2010',
+                            ))
+   }
+   if(poll_i==1){
+      write.csv(table(no2_clean$cntr_name), 'results/output/table_randomPoints_cntr.csv')
+   }
+   plotCorMap <- function(strs_v){
+      lapply(1:nrow(strs_v), function(i){
+         str1 <- strs_v[i, 1]
+         str2 <- strs_v[i, 2]
+         cor_v <- lapply(unique(no2_clean$cntr_id), function(target_cntr){
+            target_df <- no2_clean[no2_clean$cntr_id==target_cntr, ]
+            data.frame(cor=cor(target_df[, -c(1,2)])[str1, str2],
+                       cntr_id=target_df$cntr_id[1],
+                       cntr_name=target_df$cntr_name[1]) %>% 
+               mutate(r2=cor*cor) %>% 
+               rename(setNames('cor', paste0('cor (', str1, ' vs ', str2, ')')),
+                      setNames('r2', paste0('r2 (', str1, ' vs ', str2, ')')))
+         }) %>% do.call(rbind, .)
+         eu_bnd <- st_read("../expanse_shp/eu_expanse2.shp")
+         unique(eu_bnd$CNTR_ID) %>% sort()
+         names(cor_v) <- toupper(names(cor_v))
+         cor_v <- cor_v %>% dplyr::select(-CNTR_NAME)
+         cor_v_sp <- left_join(eu_bnd, cor_v, by=c('CNTR_ID'))
+         
+         # plot(cor_v_sp[6], key.pos = 1, axes = TRUE, key.width = lcm(1.3), key.length = 1.0)
+         # plot(cor_v_sp[7], key.pos = 1, axes = TRUE, key.width = lcm(1.3), key.length = 1.0)
+         
+         # tm_shape(cor_v_sp)+
+         #    tm_polygons(col=names(cor_v_sp)[6],
+         #                style = "fixed",
+         #                breaks = seq(0.2, 1, 0.2))+
+         #    tm_layout(legend.outside = TRUE) 
+         r2tmap <- tm_shape(cor_v_sp)+
+            tm_polygons(col=names(cor_v_sp)[7],
+                        style = "fixed",
+                        breaks = seq(0.2, 1, 0.2),
+                        palette = c("#FF0000", "#FFA500", '#FFFF00', "#8FBC8F", "#4682B4"))+
+            tm_layout(legend.outside = TRUE) 
+         tmap_save(r2tmap, paste0('graph/rp_cntr_', target_poll2, '_', str1, str2, '.tiff'),
+                   dpi=150, height=4, width=6, units='in')
+      })
+   }
+   lapply(list(strs_v1, strs_v2, strs_v3), plotCorMap)
+   if(poll_i==1){
+      plotCorMap(data.frame(str1='rf_2010_2010', str2='rf_00.19_2010'))
+   }
 }
 
 # the correlation does not vary with country
@@ -363,3 +393,81 @@ unique(no2_clean$cntr_name)
 unique(no2_clean$cntr_id)
 no2_clean %>% names()
 eu_bnd <- st_read("../expanse_shp/eu_expanse2.shp")
+
+
+#---------- AR plots (archive) --------
+# # The AR plots are not suitable in this case because for each station
+# # there are only 20 datapoints (20 timepoints) available.
+# calc_acf <- function(dat, varname, time_step){
+#    out_dat <- acf(dat[, varname], plot=F, lag.max=(time_step-1)*12)$acf[-1]
+#    out_dat <- as.data.frame(t(out_dat))
+#    names(out_dat) <- paste0('ar_', 1:length(out_dat))
+#    out_dat
+# }
+# acf_timeseries <- function(dat, target_str, target_poll){
+#    
+#    # From wide to long data table
+#    no2_wide <- cbind(dat[, c('system.index', 'cntr_id', 'cntr_name')], 
+#                      dat[, grepl(target_str, names(dat))])
+#    no2_long <- no2_wide %>% pivot_longer(., cols = -c('system.index', 'cntr_id', 'cntr_name'),
+#                                          names_to = 'models',
+#                                          values_to = 'predictions')
+#    no2_long$year <- as.numeric(unlist(lapply(strsplit(no2_long$models, '_'), `[[`, 3)))
+#    
+#    no2_long <- no2_long %>% 
+#       arrange(system.index, year)  # The data needs to be arranged from early times to later time
+#    tperiod <- sort(unique(no2_long$year))
+#    # dat_tbl <- table(dat$system.index)
+#    acf_dat <- no2_long%>%
+#       # filter(system.index%in%names(dat_tbl[dat_tbl==max(dat_tbl)])) %>% 
+#       group_by(system.index) %>%
+#       do(calc_acf(., 'predictions', length(tperiod)))
+#    
+#    acf_avg <- acf_dat[-1] %>% apply(., 2, mean)
+#    # summarise(
+#    #    acf1=acf(obs, plot = F)$acf[-1][1],
+#    #    acf12=acf(obs, plot = F)$acf[-1][12],
+#    #    acf24=acf(obs, plot = F)$acf[-1][24]
+#    # )
+#    ggplot(acf_dat %>% gather('ar', 'values', -'system.index') %>% mutate(lag=as.numeric(gsub('ar_', '', ar))))+
+#       geom_line(aes(x=reorder(lag, lag), y=values, group=system.index), alpha=0.25)+
+#       geom_line(data=acf_avg %>% t()%>% as.data.frame()%>% gather('ar', 'values') %>% mutate(lag=as.numeric(gsub('ar_', '', ar))), 
+#                 aes(x=reorder(lag, lag), y=values, group=1), col='red', lwd=1)+
+#       geom_text(data=acf_avg %>% 
+#                    t()%>% as.data.frame()%>% 
+#                    gather('ar', 'values') %>% mutate(lag=as.numeric(gsub('ar_', '', ar))) %>% 
+#                    filter(lag%in% c(1, seq(5, (5*length(tperiod)-1), 5))),
+#                 aes(label=round(values, 1), x=lag+0.2, y=0.9), col='red')+
+#       geom_vline(xintercept = seq(5, (5*length(tperiod)-1), 5),
+#                  lty=2)+
+#       labs(title=paste0(target_str, ' (', target_poll, ') ', min(tperiod), '-', max(tperiod)),
+#            subtitle=paste0('no. of stations=', nrow(acf_dat)),
+#            x='lag (year)', y='autocorrelation')+
+#       scale_x_discrete(breaks = c(1, seq(5, (12*length(tperiod)-1), 5)))
+#    # geom_abline(intercept = 0, slope=1)
+# }
+# plot_ar <- function(poll_i){
+#    target_poll <- target_polls[poll_i]      #'NO2'    # PM25
+#    target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
+#    
+#    
+#    no2 <- fread(paste0('data/processed/prediction_random_fromR_', target_poll2)) %>% as.data.frame()
+#    exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
+#                   'b1')
+#    acf_timeseries(no2, 'slr_20', target_poll)
+#    acf_timeseries(no2, 'gwr_20', target_poll)
+#    acf_timeseries(no2, 'rf_20', target_poll)
+#    
+#    acf_timeseries(no2, 'slr_00.19', target_poll)
+#    acf_timeseries(no2, 'rf_00.19', target_poll)
+#    
+#    
+#    # no2_clean_pure <- no2_clean %>% dplyr::select(-'cntr_id', -'cntr_name')
+#    # no2_clean_name <- no2_clean %>% dplyr::select('cntr_id', 'cntr_name')
+#    # yrs_name <- substr(names(no2_clean_pure), nchar(names(no2_clean_pure))-3, nchar(names(no2_clean_pure))) %>% as.numeric()
+#    # no2_clean_pure <- no2_clean_pure[, order(yrs_name)]
+#    # scenarios_name <- paste0(unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 1)), '_', unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 2)))
+#    # no2_clean_pure <- no2_clean_pure[, order(scenarios_name)]
+#    
+#    
+# }
