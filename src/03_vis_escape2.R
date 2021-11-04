@@ -74,6 +74,43 @@ outputCleanFiles <- function(poll_i){
    no2 <- inner_join(no2, no2_rf_pure3, by=names(no2)[names(no2)%in%names(no2_rf_pure3)])
    write.csv(no2, paste0('data/processed/prediction_escape_fromR_', target_poll2), row.names=F)
 }
+plotESCAPEMaps <- function(poll_i){
+   target_poll <- target_polls[poll_i]      #'NO2'    # PM25
+   target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
+   escape_obs <- escape_obss[poll_i]  #'no2'
+   elapseR2 <- R2s[poll_i]     ## 0.494 for NO2 and 0.648 for pm25
+   elapseRMSE <- RMSEs[poll_i]          ### 11.47 for no2 3.41 for pm25
+   no2 <- read.csv(paste0('data/processed/prediction_escape_fromR_', target_poll2))
+   
+   # Divide by country
+   if(target_poll=='NO2'){
+      raw_df <- read.csv('data/raw/NO2_ESCAPE_2010_Feb2018_updated_for_SGR_without_SPB.csv')
+   }else{
+      raw_df <- read.csv('data/raw/PM25_ESCAPE_2010_Feb2018_excluding_SGR.csv')
+   }
+   no2 <- inner_join(no2, raw_df %>% dplyr::select(allid, x_etrs, y_etrs), by='allid')
+   eu_bnd <- st_read("../expanse_shp/eu_expanse2.shp")
+   no2_p <- st_as_sf(no2, coords = c('x_etrs', 'y_etrs'), crs=st_crs(eu_bnd))
+   tm_shape(eu_bnd)+
+      tm_borders()+
+      tm_shape(no2_p)+
+      tm_dots()+
+      tm_layout(title=paste0('ESCAPE ', target_poll2),
+                frame = T)
+}
+tmapsList <- lapply(seq_along(target_polls), plotESCAPEMaps)
+tmaps <- do.call(tmap_arrange, tmapsList)
+tmap_save(tmaps, paste0('graph/ESCAPE_maps.tiff'),
+          dpi=150, height=4, width=14, units='in')  
+lapply(seq_along(target_polls), function(poll_i){
+   target_poll <- target_polls[poll_i]      #'NO2'    # PM25
+   target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
+   escape_obs <- escape_obss[poll_i]  #'no2'
+   elapseR2 <- R2s[poll_i]     ## 0.494 for NO2 and 0.648 for pm25
+   elapseRMSE <- RMSEs[poll_i]          ### 11.47 for no2 3.41 for pm25
+   no2 <- read.csv(paste0('data/processed/prediction_escape_fromR_', target_poll2))
+   nrow(no2)
+})
 plotEscapeR2 <- function(poll_i){
    target_poll <- target_polls[poll_i]      #'NO2'    # PM25
    target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
