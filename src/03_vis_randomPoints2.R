@@ -22,6 +22,8 @@ for(poll_i in 1:4){
    # SLR, GWR
    files <- list.files('data/processed/gee/', 'predictionsAll_random')
    files <- files[grepl(target_poll, files)]
+   # Only model predictions
+   files <- files[!grepl('backExtra', files)]
    # Multiple-year RF
    files2 <- list.files('data/workingData/', 'RF_result_validation_random_')
    files2 <- files2[grepl(target_poll2, files2)]
@@ -31,6 +33,9 @@ for(poll_i in 1:4){
    
    no2_l <- lapply(paste0('data/processed/gee/', files[!grepl('RF', files)]), 
                    read.csv)  #
+   no2_l <- lapply(no2_l, function(dat){
+      dat %>% dplyr::select(-x, -.geo)
+   })
    no2_linear <- do.call(rbind, no2_l)
    no2_linear$system.index <- unlist(lapply(strsplit(no2_linear$system.index, '_'), `[[`, 1))
    # Multiple-year modelling
@@ -104,8 +109,9 @@ for(poll_i in 1:4){
    
    no2_clean <- no2[, which(!(names(no2)%in%exc_names))]
    names(no2_clean)
-   no2_clean_pure <- no2_clean %>% dplyr::select(-'cntr_id', -'cntr_name')
-   no2_clean_name <- no2_clean %>% dplyr::select('cntr_id', 'cntr_name')
+   no2_clean_pure <- no2_clean %>% dplyr::select(-'cntr_id', -'nuts_id')
+   no2_clean_name <- no2_clean %>% dplyr::select('cntr_id', 'nuts_id')
+   no2_clean <- cbind(no2_clean_name, no2_clean_pure)
    yrs_name <- substr(names(no2_clean_pure), nchar(names(no2_clean_pure))-3, nchar(names(no2_clean_pure))) %>% as.numeric()
    no2_clean_pure <- no2_clean_pure[, order(yrs_name)]
    scenarios_name <- paste0(unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 1)), '_', unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 2)))
@@ -325,7 +331,7 @@ for(poll_i in 1:4){
                             ))
    }
    if(poll_i==1){
-      write.csv(table(no2_clean$cntr_name), 'results/output/table_randomPoints_cntr.csv')
+      write.csv(table(no2_clean$cntr_id), 'results/output/table_randomPoints_cntr.csv')
    }
    plotCorMap <- function(strs_v){
       lapply(1:nrow(strs_v), function(i){
@@ -334,17 +340,16 @@ for(poll_i in 1:4){
          cor_v <- lapply(unique(no2_clean$cntr_id), function(target_cntr){
             target_df <- no2_clean[no2_clean$cntr_id==target_cntr, ]
             data.frame(cor=cor(target_df[, -c(1,2)])[str1, str2],
-                       cntr_id=target_df$cntr_id[1],
-                       cntr_name=target_df$cntr_name[1]) %>% 
+                       cntr_code=target_df$cntr_id[1],
+                       nuts_id=target_df$nuts_id[1]) %>% 
                mutate(r2=cor*cor) %>% 
                rename(setNames('cor', paste0('cor (', str1, ' vs ', str2, ')')),
                       setNames('r2', paste0('r2 (', str1, ' vs ', str2, ')')))
          }) %>% do.call(rbind, .)
-         eu_bnd <- st_read("../expanse_shp/eu_expanse2.shp")
+         eu_bnd <- st_read("data/processed/nuts1_expanse.shp")
          unique(eu_bnd$CNTR_ID) %>% sort()
          names(cor_v) <- toupper(names(cor_v))
-         cor_v <- cor_v %>% dplyr::select(-CNTR_NAME)
-         cor_v_sp <- left_join(eu_bnd, cor_v, by=c('CNTR_ID'))
+         cor_v_sp <- left_join(eu_bnd, cor_v, by=c('CNTR_CODE', 'NUTS_ID'))
          
          # plot(cor_v_sp[6], key.pos = 1, axes = TRUE, key.width = lcm(1.3), key.length = 1.0)
          # plot(cor_v_sp[7], key.pos = 1, axes = TRUE, key.width = lcm(1.3), key.length = 1.0)
