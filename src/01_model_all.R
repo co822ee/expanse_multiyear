@@ -3,7 +3,7 @@
 
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 # Whether to tune RF
-target_poll = 'O3'
+target_poll = 'PM10'
 tuneRF_b = T
 local_crs <- CRS("+init=EPSG:3035")
 seed <- 123

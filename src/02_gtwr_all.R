@@ -3,7 +3,7 @@ rm(list=ls())
 if(!dir.exists('data/workingData/gtwr_coef/')) dir.create('data/workingData/gtwr_coef/')
 #------ 1) Read in data ------
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
-target_poll = 'PM2.5'
+target_poll = 'NO2'
 obs_varname = 'obs'
 # Multiple single years
 csv_names <- paste0('all_',target_poll, "_",c('08-10', '09-11', '10-12', 

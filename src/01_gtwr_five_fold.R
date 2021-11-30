@@ -4,7 +4,7 @@
 source("../EXPANSE_algorithm/scr/fun_call_lib.R")
 library(doParallel)
 library(foreach)
-target_poll = 'PM2.5'
+target_poll = 'PM10'
 obs_varname = 'obs'
 # Multiple single years
 csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12', 
@@ -62,7 +62,8 @@ for(yr_i in seq_along(csv_names)){
          grd2 <- create_regressionGrid(eu_bnd, 200000, local_crs)
          
          # Output the predictions at validation points using GTWR 
-         gtwr_valid <- lapply(years[[yr_i]], tuneGTWR, sp_train1=sp_train, grid_i=which.max(gtwr_param$rsq),
+         gtwr_valid <- lapply(years[[yr_i]], tuneGTWR, sp_train1=sp_train, 
+                              grid_i=which.max(gtwr_param$rsq),
                               sp_valid1=sp_test, valid_sub1=test_sub, 
                               target_poll=target_poll, eq=eq, grd=grd2, 
                               param=gtwr_param) %>% do.call(rbind, .) 
