@@ -99,9 +99,9 @@ plotESCAPEMaps <- function(poll_i){
                 frame = T)
 }
 tmapsList <- lapply(seq_along(target_polls), plotESCAPEMaps)
-tmaps <- do.call(tmap_arrange, tmapsList)
-tmap_save(tmaps, paste0('graph/ESCAPE_maps.tiff'),
-          dpi=150, height=4, width=14, units='in')  
+# tmaps <- do.call(tmap_arrange, tmapsList)
+# tmap_save(tmaps, paste0('graph/ESCAPE_maps.tiff'),
+#           dpi=150, height=4, width=14, units='in')  
 lapply(seq_along(target_polls), function(poll_i){
    target_poll <- target_polls[poll_i]      #'NO2'    # PM25
    target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
