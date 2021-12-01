@@ -71,10 +71,10 @@ foreach(poll_i = seq_along(target_polls))  %dopar%  {
 stopCluster(cl)
 gc()
 ##########--------------Boxplot -------------- ##########
-cluster_no <- 4
-cl <- parallel::makeCluster(cluster_no)
-doParallel::registerDoParallel(cl)
-foreach(poll_i = seq_along(target_polls))  %dopar%  {
+# cluster_no <- 4
+# cl <- parallel::makeCluster(cluster_no)
+# doParallel::registerDoParallel(cl)
+dat_long_newL <- lapply(seq_along(target_polls), function(poll_i){
    library(dplyr)
    library(tidyr)
    library(gtools)
@@ -119,38 +119,38 @@ foreach(poll_i = seq_along(target_polls))  %dopar%  {
    dat_long$scenario <- lapply(strsplit(dat_long$method, '_'), `[[`, 2) %>% unlist
    dat_long$model <- (lapply(strsplit(dat_long$method, '_'), `[[`, 1) %>% unlist)
    dat_long$year <- as.numeric(lapply(strsplit(dat_long$method, '_'), `[[`, 3) %>% unlist)
+   dat_long$scenario <- gsub('\\.', '-', dat_long$scenario)
    dat_long_new <- dat_long %>% 
-      mutate(algorithm=paste0(model, '_', scenario),
+      filter(model!='gwr', model!='slr') %>% 
+      mutate(algorithm=ifelse(scenario%in%c('ratio', 'diff'), scenario, paste0(model, '_', scenario)),
              index=ifelse(scenario%in%c('ratio', 'diff'), 2, 1),
-             scenario=ifelse(grepl('20', scenario), 'single-year', scenario),
-             algorithm=ifelse(index==2, algorithm, as.character(model)),
-             model=ifelse(model%in%c('gwr', 'gtwr'), 'gwr/gtwr', as.character(model))
+             model=ifelse(scenario=='00-19', 'GTWR00-19', scenario),
+             algorithm=ifelse(index==2, algorithm, as.character(model))
+             # model=ifelse(model%in%c('gwr', 'gtwr'), 'gwr/gtwr', as.character(model))
       ) 
-   
-   
-   ggplot(dat_long_new)+
-      geom_boxplot(aes(reorder(algorithm, index), values, 
-                       fill=scenario))+
-      facet_grid(year~model, scales='free_x')+
-      labs(title=paste0(target_poll2),
-           x='model', y='prediction')+
-      theme_bw()+
-      theme(strip.text = element_text(size = 12),
-            axis.title = element_text(size = 19),
-            axis.text = element_text(size = 16),
-            axis.text.x = element_text(size = 12, angle = 20),
-            title = element_text(size = 19),
-            legend.title = element_text(size = 16),
-            legend.text = element_text(size = 12),
-            panel.grid.major = element_line(colour = "grey70", size = 0.2),
-            panel.grid.minor = element_blank())
-   
-   ggsave(paste0('graph/backExtrapo_boxplot_', target_poll, '.png'),
-          height=8, width=8, units='in', dpi=100)
-}
-stopCluster(cl)
-gc()
+   dat_long_new$poll <- target_poll2
+   dat_long_new
+})
+dat_long_new <- dat_long_newL %>% do.call(rbind, .)
+dat_long_new <- dat_long_new %>% mutate(values=ifelse(values<0, 0, values))
+ggplot(dat_long_new)+
+   geom_boxplot(aes(reorder(model, index), values))+
+   facet_grid(year~poll, scales='free_x')+
+   labs(x='', y='predicted concentrations (\U003BCg/m\U00B3)')+
+   theme_bw()+
+   theme(strip.text = element_text(size = 12),
+         axis.title = element_text(size = 19),
+         axis.text = element_text(size = 16),
+         axis.text.x = element_text(size = 12),
+         title = element_text(size = 19),
+         legend.title = element_text(size = 16),
+         legend.text = element_text(size = 12),
+         panel.grid.major = element_line(colour = "grey70", size = 0.2),
+         panel.grid.minor = element_blank())+
+   coord_flip()
 
+ggsave(paste0('graph/backExtrapo_boxplotAll', '.png'),
+       height=8, width=15, units='in', dpi=100)
 
 
 ##########-------------- Correlation geographic maps -------------- ##########
