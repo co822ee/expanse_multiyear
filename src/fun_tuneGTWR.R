@@ -17,9 +17,9 @@ tuneGTWR <- function(sp_train1, gtwr_yr, grid_i, sp_valid1, valid_sub1, target_p
       
       source('src/fun_outputGTWR.R')
       gtwr_model <- outputGTWR(sp_train1, gtwr_yr, target_poll, eq, grd, 
-                               param$lamda[grid_i], 
-                               param$ksi[grid_i],
-                               param$conv_dist[grid_i]
+                               gtwr_param$lamda[grid_i], 
+                               gtwr_param$ksi[grid_i],
+                               gtwr_param$conv_dist[grid_i]
       )
       
       if(typeof(gtwr_model)!='logical'&(!is.null(gtwr_model))){
