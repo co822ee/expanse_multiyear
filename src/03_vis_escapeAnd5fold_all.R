@@ -398,11 +398,11 @@ dat_r2 <- dat_r2[, order(names(dat_r2))]
 dat_r2$data <- '5-fold CV (LUR)'
 ## REad in 5-fold back-extrapolation (using gtwr00-19 for 2010 as the benchmark surface)
 em_df_back <- lapply(c(target_polls, 'O3'), function(target_pollss){
-   target_poll <- target_pollss[poll_i]
+   target_poll <- target_pollss
    if(target_pollss=='PM25'){
       target_poll2 <- 'PM2.5'
    }else{
-      target_poll2 <- target_poll
+      target_poll2 <- target_pollss
    }
    back_extrapo <- fread(paste0('../expanse_multiyear/data/processed/gee/predictionsAll_5fold_', target_poll, '.csv'))
    back_extrapo <- back_extrapo %>% dplyr::select(-'system:index', -'.geo')

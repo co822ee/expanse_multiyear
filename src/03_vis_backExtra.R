@@ -138,19 +138,19 @@ ggplot(dat_long_new)+
    facet_grid(year~poll, scales='free_x')+
    labs(x='', y='predicted concentrations (\U003BCg/m\U00B3)')+
    theme_bw()+
-   theme(strip.text = element_text(size = 12),
+   theme(strip.text = element_text(size = 13),
          axis.title = element_text(size = 19),
          axis.text = element_text(size = 16),
-         axis.text.x = element_text(size = 12),
+         axis.text.x = element_text(size = 13),
          title = element_text(size = 19),
          legend.title = element_text(size = 16),
-         legend.text = element_text(size = 12),
+         legend.text = element_text(size = 13),
          panel.grid.major = element_line(colour = "grey70", size = 0.2),
          panel.grid.minor = element_blank())+
    coord_flip()
 
 ggsave(paste0('graph/backExtrapo_boxplotAll', '.png'),
-       height=8, width=15, units='in', dpi=100)
+       height=8, width=13, units='in', dpi=100)
 
 
 ##########-------------- Correlation geographic maps -------------- ##########
