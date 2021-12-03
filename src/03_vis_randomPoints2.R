@@ -93,6 +93,38 @@ for(poll_i in 1:4){
    fwrite(no2, paste0('data/processed/prediction_random_fromR_', target_poll2), row.names=F)
    rm(list=c('no2_rf_pure_l', 'no2_rf_pure_l3', 'no2_l'))
 }
+##--------boxplot plots========
+df_all <- lapply(1:4, function(poll_i){
+   target_poll <- target_polls[poll_i]      #'NO2'    # PM25
+   target_poll2 <- target_polls2[poll_i]    #'NO2'   # PM2.5
+   
+   
+   no2 <- fread(paste0('data/processed/prediction_random_fromR_', target_poll2)) %>% as.data.frame()
+   
+   exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
+                  'b1')
+   
+   no2_clean <- no2[, which(!(names(no2)%in%exc_names))]
+   names(no2_clean)
+   no2_clean_pure <- no2_clean %>% dplyr::select(-'cntr_id', -'nuts_id')
+   no2_clean_name <- no2_clean %>% dplyr::select('cntr_id', 'nuts_id')
+   no2_clean <- cbind(no2_clean_name, no2_clean_pure)
+   yrs_name <- substr(names(no2_clean_pure), nchar(names(no2_clean_pure))-3, nchar(names(no2_clean_pure))) %>% as.numeric()
+   no2_clean_pure <- no2_clean_pure[, order(yrs_name)]
+   scenarios_name <- paste0(unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 1)), '_', unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 2)))
+   no2_clean_pure <- no2_clean_pure[, order(scenarios_name)]
+   no2_clean_pure_2 <- no2_clean_pure[, grepl('gtwr_00.19', names(no2_clean_pure))]
+   names(no2_clean_pure_2) <- unlist(lapply(strsplit(names(no2_clean_pure_2), '_'),
+                                            `[[`, 3))
+   no2_clean_pure_2[no2_clean_pure_2<0] <- 0
+   no2_clean_pure_2 <- no2_clean_pure_2 %>% gather('year', 'values')
+   no2_clean_pure_2$poll <- target_poll
+   no2_clean_pure_2
+})
+df_all2 <- do.call(rbind, df_all)
+ggplot(df_all2)+
+   geom_boxplot(aes(x=year, y=values, group=year))+
+   facet_grid(poll~., scales='free_y')
 
 #------------ Correlation plots ------------
 for(poll_i in 1:4){
@@ -101,9 +133,7 @@ for(poll_i in 1:4){
    
    
    no2 <- fread(paste0('data/processed/prediction_random_fromR_', target_poll2)) %>% as.data.frame()
-   if(poll_i%in%c(3)){
-      no2 <- no2[, !grepl('gtwr', names(no2))]
-   }
+   
    exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
                   'b1')
    
