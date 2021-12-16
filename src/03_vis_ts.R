@@ -165,7 +165,7 @@ ggplot()+
    # geom_line(data=obs_q50, aes(x=year, y=values, col=model), lty=2)+
    theme_bw()+
    scale_color_manual(values=c('black','red'))+
-   labs(color='')+
+   labs(color='',y=expression(concentrations~(ug/m^3)))+
    facet_wrap(component_caption~climate_zone, scales='free')
 ggsave('graph/obs_ts.tiff', width = 10, height=6)
 
