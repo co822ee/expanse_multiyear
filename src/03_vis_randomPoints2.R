@@ -8,6 +8,7 @@ library(sf)
 library(data.table)
 library(tmap)
 library(rlang)
+library(raster)
 target_polls <- c('NO2', 'PM25', 'PM10', 'O3')
 target_polls2 <- c('NO2', 'PM2.5', 'PM10', 'O3')
 
@@ -93,6 +94,8 @@ for(poll_i in 1:4){
    fwrite(no2, paste0('data/processed/prediction_random_fromR_', target_poll2), row.names=F)
    rm(list=c('no2_rf_pure_l', 'no2_rf_pure_l3', 'no2_l'))
 }
+
+
 ##--------boxplot plots========
 df_all <- lapply(1:4, function(poll_i){
    target_poll <- target_polls[poll_i]      #'NO2'    # PM25
