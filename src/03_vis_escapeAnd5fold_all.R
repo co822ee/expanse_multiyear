@@ -389,8 +389,9 @@ em_df5fold2 <- do.call(rbind, em_df5fold2)
 
 em_df_all <- rbind(em_df5fold, em_df5fold2)
 dat_r2 <- em_df_all %>% filter(EM=='rsq', !period%in%c('08-10', '09-11', '10-12', 
-                                                       '08-12', '06-12', '12-19'),
-                               year%in%c(2000, 2005, 2010, 2015, 2019)) %>%  
+                                                       '08-12', '06-12', '12-19')
+                               # year%in%c(2000, 2005, 2010, 2015, 2019)
+                               ) %>%  
    gather("model", "values", -c("year", "EM", 'poll', 'period'))
 dat_r2 <- dat_r2[!is.na(dat_r2$values), ] %>% 
    mutate(model=ifelse(period=='00-19', paste0(model, period), model))
@@ -433,8 +434,9 @@ em_df_back <- lapply(c(target_polls, 'O3'), function(target_pollss){
 dat_r2_back <- em_df_back %>%
    dplyr::select(-slr, -gwr, -rf) %>% 
    filter(EM=='rsq', !period%in%c('08-10', '09-11', '10-12', 
-                                  '08-12', '06-12', '12-19'),
-          year%in%c(2000, 2005, 2010, 2015, 2019)) %>%  
+                                  '08-12', '06-12', '12-19')
+          # year%in%c(2000, 2005, 2010, 2015, 2019)
+          ) %>%  
    gather("model", "values", -c("year", "EM", 'poll', 'period', 'data'))
 dat_r2_back <- dat_r2_back[!is.na(dat_r2_back$values), ] %>% 
    mutate(model=ifelse(period=='00-19', paste0(model, period), model))
@@ -445,22 +447,48 @@ dat_r2_back$data <- paste0('5-fold CV ', '(', dat_r2_back$data, ')')
 dat_r2_escape <- lapply(seq_along(target_polls2), outputEscapeR2) %>% 
    do.call(rbind,.) %>% 
    filter(EM=='rsq', !period%in%c('08-10', '09-11', '10-12', 
-                                  '08-12', '06-12', '12-19'),
-          year%in%c(2000, 2005, 2010, 2015, 2019)) %>% 
+                                  '08-12', '06-12', '12-19')
+          # year%in%c(2000, 2005, 2010, 2015, 2019)
+          ) %>% 
    mutate(model=ifelse(period=='00-19', paste0(model, period), model))
 
 
 ## 
 dat_r2_all <- rbind(dat_r2, dat_r2_back %>% filter(year!=2010), dat_r2_escape)
 dat_r2_all <- dat_r2_all %>%
-   filter(model!='rf'&model!='rf00-19') %>% 
-   mutate(model=factor(model, levels = c('gtwr00-19', 'gwr', 'slr00-19', 'slr')),
+   # filter(model!='rf'&model!='rf00-19') %>% 
+   mutate(model=factor(model, levels = c('rf00-19','rf','gtwr00-19', 'gwr', 'slr00-19', 'slr')),
           data=factor(data, levels = unique(dat_r2_all$data)[c(3,2,1,4)]))
+source("../expanse_multiyear/src/00_fun_read_data_gee.R")
+obs_stat <- read.csv('results/output/obs_stat.csv')
+obs_stat <- obs_stat %>% rename(poll=component_caption)
+dat_r2_all2 <- dat_r2_all %>% filter(data=='5-fold CV (LUR)') %>% 
+   dplyr::select(-period) %>% 
+   spread('model', 'values')
+outdf <- dat_r2_all2 %>% 
+   inner_join(., obs_stat, by=c('year','poll'))
+outdf[,c(10,9,8,7,6,5)] <- round(outdf[,c(10,9,8,7,6,5)], 3)
+outdf <- outdf[,c(1:4,10,9,8,7,6,5,11,12,13)] %>% 
+   mutate(poll=factor(poll, levels=c('NO2','O3','PM10','PM2.5'))) %>% 
+   arrange(poll, year)
+write.csv(outdf,
+          'results/output/allR2.csv',
+          row.names = F)
+write.csv(dat_r2_all %>% filter(model=='gtwr00-19', data=='5-fold CV (LUR)') %>% 
+             inner_join(., obs_stat, by=c('year','poll')) %>% 
+             mutate(values=round(values, 3), obs=round(obs, 3)) %>% 
+             mutate(poll=factor(poll, levels=c('NO2','O3','PM10','PM2.5'))) %>% 
+             arrange(poll, year),
+          'results/output/gtwr0019R2.csv',
+          row.names = F)
+
+
 
 ggplot(dat_r2_all, 
        aes(x=reorder(model, as.numeric(model)), y=values, 
            shape=data, color=data))+
    geom_point(size=2, alpha=0.8)+
+   scale_color_manual(values=c('#75FF33','#33DBFF','#BD33FF', '#FF5733'))+
    # facet_grid(EM~., scales ='free')+
    # labs(title=years[[i]])+
    labs(y="R squared", x='')+
@@ -470,11 +498,56 @@ ggplot(dat_r2_all,
          legend.title = element_text(size = 16),
          legend.text = element_text(size = 16),
          strip.text.y = element_text(size = 15))+
-   facet_grid(year~poll)+
+   facet_grid(year~poll, scales = 'free')+
    coord_flip()+
    theme_bw()+
    guides(fill = guide_legend(reverse = TRUE))
-ggsave('graph/R2_v2excludeRF.tiff', width=7.5, height=4, units='in', dpi=200)
+ggsave('graph/R2_v2all.tiff', width=7.5, height=14, units='in', dpi=200)
+
+
+ggplot(dat_r2_all %>% filter(!data%in%c('5-fold CV (ratio)', '5-fold CV (diff)')), 
+       aes(x=reorder(model, as.numeric(model)), y=values, 
+           shape=data, color=data))+
+   geom_point(size=2, alpha=0.8)+
+   scale_shape_manual(values=c(15,3))+
+   scale_color_manual(values=c('#BD33FF', '#FF5733'))+
+   # facet_grid(EM~., scales ='free')+
+   # labs(title=years[[i]])+
+   labs(y="R squared", x='')+
+   theme(axis.title = element_text(size = 18),
+         axis.text = element_text(size = 13),
+         axis.text.x = element_text(angle = 90),
+         legend.title = element_text(size = 16),
+         legend.text = element_text(size = 16),
+         strip.text.y = element_text(size = 15))+
+   facet_grid(year~poll, scales = 'free')+
+   coord_flip()+
+   theme_bw()+
+   guides(fill = guide_legend(reverse = TRUE))
+ggsave('graph/R2_v2LURall.tiff', width=7.5, height=14, units='in', dpi=200)
+
+ggplot(dat_r2_all %>% 
+          filter(year%in%c(2000, 2005, 2010, 2015, 2019)) %>% 
+          filter(!data%in%c('5-fold CV (ratio)', '5-fold CV (diff)')),
+       aes(x=reorder(model, as.numeric(model)), y=values,
+           shape=data, color=data))+
+   geom_point(size=2, alpha=0.8)+
+   scale_shape_manual(values=c(15,3))+
+   scale_color_manual(values=c('#BD33FF', '#FF5733'))+
+   # facet_grid(EM~., scales ='free')+
+   # labs(title=years[[i]])+
+   labs(y="R squared", x='')+
+   theme(axis.title = element_text(size = 18),
+         axis.text = element_text(size = 13),
+         axis.text.x = element_text(angle = 90),
+         legend.title = element_text(size = 16),
+         legend.text = element_text(size = 16),
+         strip.text.y = element_text(size = 15))+
+   facet_grid(year~poll, scales = 'free')+
+   coord_flip()+
+   theme_bw()+
+   guides(fill = guide_legend(reverse = TRUE))
+ggsave('graph/R2_v2LUR.tiff', width=7.5, height=5, units='in', dpi=200)
 
 ### RMSE
 dat_r2 <- em_df_all %>% filter(EM=='RMSE', !period%in%c('08-10', '09-11', '10-12', 
