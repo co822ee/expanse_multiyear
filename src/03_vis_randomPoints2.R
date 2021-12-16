@@ -105,13 +105,28 @@ df_all <- lapply(1:4, function(poll_i){
    no2 <- fread(paste0('data/processed/prediction_random_fromR_', target_poll2)) %>% as.data.frame()
    
    exc_names <- c('system.index', 'constant', 'latitude', 'longitude', 'x', '.geo',
-                  'b1')
+                  'b1', 'climate_zone', 'zoneID')
    
-   no2_clean <- no2[, which(!(names(no2)%in%exc_names))]
+   
+   zoneID <- lapply(paste0('../expanse_monthly/data/raw/gee/', list.files('../expanse_monthly/data/raw/gee/', 'zoneID')),
+                    fread) %>% do.call(rbind, .) %>% 
+      rename(zoneID=b1,`system.index`=`system:index`)
+   
+   zoneID$`system.index` <- unlist(lapply(strsplit(zoneID$`system.index`, '_'), `[[`,1))
+   all_df <- inner_join(zoneID[, c('zoneID', 'system.index')], 
+                        no2, by='system.index')
+   all_df <- inner_join(
+      read.csv('../EXPANSE_predictor/data/processed/climate_code.csv'),
+      all_df,
+      by='zoneID')
+   
+   
+   no2_clean <- all_df[, which(!(names(all_df)%in%exc_names))]
    names(no2_clean)
    no2_clean_pure <- no2_clean %>% dplyr::select(-'cntr_id', -'nuts_id')
+   no2_clean_pure2 <- all_df %>% dplyr::select('system.index', 'climate_zone', 'zoneID')
    no2_clean_name <- no2_clean %>% dplyr::select('cntr_id', 'nuts_id')
-   no2_clean <- cbind(no2_clean_name, no2_clean_pure)
+   # no2_clean <- cbind(no2_clean_name, no2_clean_pure, no2_clean_pure2)
    yrs_name <- substr(names(no2_clean_pure), nchar(names(no2_clean_pure))-3, nchar(names(no2_clean_pure))) %>% as.numeric()
    no2_clean_pure <- no2_clean_pure[, order(yrs_name)]
    scenarios_name <- paste0(unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 1)), '_', unlist(lapply(strsplit(names(no2_clean_pure), '_'), `[[`, 2)))
@@ -120,14 +135,29 @@ df_all <- lapply(1:4, function(poll_i){
    names(no2_clean_pure_2) <- unlist(lapply(strsplit(names(no2_clean_pure_2), '_'),
                                             `[[`, 3))
    no2_clean_pure_2[no2_clean_pure_2<0] <- 0
-   no2_clean_pure_2 <- no2_clean_pure_2 %>% gather('year', 'values')
+   no2_clean_pure_2 <- cbind(no2_clean_pure_2, no2_clean_pure2)
+   no2_clean_pure_2 <- no2_clean_pure_2 %>% gather('year', 'values', -c('system.index','climate_zone','zoneID'))
    no2_clean_pure_2$poll <- target_poll
    no2_clean_pure_2
 })
 df_all2 <- do.call(rbind, df_all)
 ggplot(df_all2)+
    geom_boxplot(aes(x=year, y=values, group=year))+
-   facet_grid(poll~., scales='free_y')
+   facet_grid(poll~climate_zone, scales='free_y')
+df_all2_avg <- df_all2 %>% group_by(year, poll, climate_zone) %>% 
+   summarise(values=mean(values)) %>% 
+   ungroup() %>% 
+   mutate(year=as.numeric(as.character(year)))
+ggplot()+
+   geom_line(data=df_all2_avg, aes(x=year, y=values, group=poll))+
+   facet_wrap(poll~climate_zone, scales='free')+
+   labs(y=expression(predicted~concentrations~(ug/m^3)))+
+   theme_bw()
+ggsave('graph/randomPoints_ts.tiff', width = 10, height=6)
+
+# ggplot()+
+#    geom_point(data=df_all2_avg, aes(x=year, y=values))+
+#    facet_wrap(poll~climate_zone, scales='free')
 
 #------------ Correlation plots ------------
 for(poll_i in 1:4){
