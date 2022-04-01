@@ -2,43 +2,45 @@
 # The difference between 00_optimize_gtwr.R and 00_optimize_gtwr2.R is that 
 # the former is fold-wise and the latter is paramater-grid-wise.
 
-#------ 1) Read in data ------
-source("../EXPANSE_algorithm/scr/fun_call_lib.R")
-library(doParallel)
-library(foreach)
-target_poll = 'PM10'
-obs_varname = 'obs'
-# Multiple single years
-csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12', 
-                                             '08-12', '06-12', '12-19', '00-19'))   #2008:2012
-years <- list(2008:2010, 2009:2011, 2010:2012, 
-              2008:2012, 2006:2012, 2012:2019, 2000:2019)
 nfold <- 5
 yr_i <- 7
-# gtwr_yr <- 2010
-# fold_i <- 1
 ## ------ *** useful function -----
 
-
-########### ------ optimize the parameters ------------ #######
-for(yr_i in seq_along(csv_names)){
-   csv_name <- csv_names[yr_i]
-   print("********************************************")
-   print(csv_name)
-   
-   source("../expanse_multiyear/src/00_fun_read_data_gee.R")
-   
-   csv_name <- csv_names[yr_i]
-   df_sub <- read_data(target_poll, years[[yr_i]])
-   # Create a grid of parameters (lamda & ksi)  using expand.grid
+gtwr_param <- expand.grid(lamda=c(0.01, 0.05, 0.1, 0.5, 0.8, 1.0), 
+                          ksi=seq(0, pi/2, pi/4), 
+                          conv_dist=c(0.5, 1, 3, 5, 10, 20, 40)*1000)  # unit of conv_dist: meter/time-unit (here the time-unit=year)
+library(doParallel)
+library(foreach)
+cluster_no <- 8
+cl <- parallel::makeCluster(cluster_no)
+doParallel::registerDoParallel(cl)
+foreach(param_i = 1:nrow(gtwr_param))  %dopar%  {
    gtwr_param <- expand.grid(lamda=c(0.01, 0.05, 0.1, 0.5, 0.8, 1.0), 
                              ksi=seq(0, pi/2, pi/4), 
                              conv_dist=c(0.5, 1, 3, 5, 10, 20, 40)*1000)  # unit of conv_dist: meter/time-unit (here the time-unit=year)
    
-   cluster_no <- 3
-   cl <- parallel::makeCluster(cluster_no)
-   doParallel::registerDoParallel(cl)
-   foreach(param_i = 1:nrow(gtwr_param))  %dopar%  {
+   #------ 1) Read in data ------
+   source("../EXPANSE_algorithm/scr/fun_call_lib.R")
+   
+   target_poll = 'O3'
+   obs_varname = 'obs'
+   # Multiple single years
+   csv_names <- paste0('o3_',target_poll, "_",c('08-10', '09-11', '10-12', 
+                                                '08-12', '06-12', '12-19', '00-19'))   #2008:2012
+   years <- list(2008:2010, 2009:2011, 2010:2012, 
+                 2008:2012, 2006:2012, 2012:2019, 2000:2019)
+   ########### ------ optimize the parameters ------------ #######
+   for(yr_i in seq_along(csv_names)){
+      csv_name <- csv_names[yr_i]
+      print("********************************************")
+      print(csv_name)
+      
+      source("../expanse_multiyear/src/00_fun_read_data_gee.R")
+      
+      csv_name <- csv_names[yr_i]
+      df_sub <- read_data(target_poll, years[[yr_i]])
+      # Create a grid of parameters (lamda & ksi)  using expand.grid
+      
       source("../EXPANSE_algorithm/scr/fun_call_lib.R")
       source('src/fun_creat_spPoints.R')
       source('src/fun_create_regressionGrid.R')
